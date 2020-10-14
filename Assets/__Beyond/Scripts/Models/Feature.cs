@@ -28,13 +28,13 @@ namespace Beyond
             snappedTo = new List<GameObject>();
         }
 
-        public Feature(Vector3 v , string t , string snapToTag)
+        public Feature(Vector3 v , string t , List<string> stt)
         {
             snapToTags = new List<string>();
             snappedTo = new List<GameObject>();
             offset = v;
             tag = t;
-            addSnapToTag(snapToTag);
+            snapToTags = stt;
         }
 
         public void setGameObject(GameObject g)
@@ -49,7 +49,7 @@ namespace Beyond
 
         public void addSnapToTag(string s)
         {
-            if (!snapToTags.Contains(s))
+            if (!snapToTags.Contains(s) && s!=null)
             {
                 snapToTags.Add(s);
             }

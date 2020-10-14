@@ -11,6 +11,7 @@ namespace Beyond
     // This script is attached to all objects specific to Beyond that can be created & placed
     public class BeyondComponent : MonoBehaviour
     {
+        public Template template;
         //TODO : Use this to determine what it should collide with, snap with, etc
         public BC_State state { get; protected set; }
         public List<Feature> features { get; protected set; }
@@ -25,13 +26,11 @@ namespace Beyond
             objectsColliding = new HashSet<GameObject>();
         }
 
-        public void initialise(List<Feature> lf, Vector3 cb)
+        public void initialise(Template t)
         {
-            features = lf;
-            castBox = cb;
-
-            //TODO : this is where we must go through all features and create GameObjects, colliders, textures, etc... based on the feature's type
-            // THen we cna remove createAllFeatures
+            template = t;
+            castBox = t.castBox;
+            features = t.features;
         }
 
         public void setObjectGroup (BeyondGroup g)
@@ -54,31 +53,15 @@ namespace Beyond
         public void createAllFeatures()
         {
             castBox = new Vector3(5f, 0.1f, 5f);
-            //These are 4 features at the bottom of the BeyondComponent 
-            Feature a1 = new Feature(new Vector3(0.5f, -0.5f, 0.5f), "InTerrain", "Terrain");
-            a1.addLink(Vector3Int.right);
-            a1.addLink(new Vector3Int(0, 0, 1));
-            a1.addLink(Vector3Int.up);
-            a1.addLink(Vector3Int.down);
-            Feature a2 = new Feature(new Vector3(0.5f, -0.5f, -0.5f), "InTerrain", "Terrain");
-            a2.addLink(Vector3Int.right);
-            a2.addLink(new Vector3Int(0, 0, -1));
-            a2.addLink(Vector3Int.up);
-            a2.addLink(Vector3Int.down);
-            Feature a3 = new Feature(new Vector3(-0.5f, -0.5f, -0.5f), "InTerrain", "Terrain");
-            a3.addLink(Vector3Int.left);
-            a3.addLink(new Vector3Int(0, 0, -1));
-            a3.addLink(Vector3Int.up);
-            a3.addLink(Vector3Int.down);
-            Feature a4 = new Feature(new Vector3(-0.5f, -0.5f, 0.5f), "InTerrain", "Terrain");
-            a4.addLink(Vector3Int.left);
-            a4.addLink(new Vector3Int(0, 0, 1));
-            a4.addLink(Vector3Int.up);
-            a4.addLink(Vector3Int.down);
-            features.Add(a1);
-            features.Add(a2);
-            features.Add(a3);
-            features.Add(a4);
+            foreach (Feature ft in template.features)
+            { // Create the features based on the template's features. Can't do features = template.features as it make Unity create distinct instances of GameObjects below (took me 3 hours to figure this bug out)
+                Feature f = new Feature(ft.offset, ft.tag, ft.snapToTags);
+                foreach (Vector3Int v in ft.canLinkTo)
+                {
+                    f.addLink(v);
+                }
+                features.Add(f);
+            }
             int i = 0;
             foreach (Feature f in features)
             {

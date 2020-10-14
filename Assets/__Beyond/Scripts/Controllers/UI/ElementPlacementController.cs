@@ -14,9 +14,6 @@ namespace Beyond
         int nbObjectsPlaced = 0;
 
         [SerializeField]
-        private GameObject placeableObjectPrefab;
-
-        [SerializeField]
         private KeyCode newObjectHotKey = KeyCode.U;
         private KeyCode lowerTerrainHotKey = KeyCode.T;
 
@@ -168,6 +165,7 @@ namespace Beyond
                 HashSet<GameObject> collidedPlacedObjects = new HashSet<GameObject>();
                 HashSet<Vector3> uniqueNeighbourCentres = new HashSet<Vector3>();
                 Dictionary<Vector3,GameObject> placedObjectAtCentre = new Dictionary<Vector3, GameObject>();
+                // Put the parent of the collided feature in collidedPlacedObjects
                 foreach (GameObject featureCollided in featuresColliding)
                 {
                     collidedPlacedObjects.Add(featureCollided.transform.parent.gameObject);
@@ -211,6 +209,7 @@ namespace Beyond
                         }
                     }
                 }
+                //Debug.Log(s);
                 // 6 - Check the closest centre to the currentPlaceableObject
                 if (collidedPlacedObjects.Count>0)
                 {
@@ -223,6 +222,7 @@ namespace Beyond
                             d = d2;
                             currentPlaceableObject.transform.position = candidateCentre;
                             currentPlaceableObject.transform.rotation = placedObjectAtCentre[candidateCentre].transform.rotation;
+                            //TODO : should I really set the group here  ?
                             BeyondGroup group = placedObjectAtCentre[candidateCentre].GetComponent<BeyondComponent>().beyondGroup;
                             if (group!=null)
                             {
@@ -276,8 +276,8 @@ namespace Beyond
             {
                 if (canPlace)
                 {
-                    Renderer r = currentPlaceableObject.GetComponent<Renderer>();
-                    r.material = placeableObjectPrefab.GetComponent<Renderer>().sharedMaterial;
+                    // Set the material back to the prefab's material to get rid of the green or red colours
+                    currentPlaceableObject.GetComponent<Renderer>().material = TemplateController.prefabMaterial(currentPlaceableBeyondComponent.template);
                     // TODO : Really need to think hard about this: will the box collider as trigger really be a general case for all elements ?
                     currentPlaceableObject.GetComponent<BoxCollider>().isTrigger = false;
                     currentPlaceableObject.GetComponent<BoxCollider>().enabled = true;
@@ -304,12 +304,9 @@ namespace Beyond
             {
                 if (currentPlaceableObject == null)
                 {
-                    currentPlaceableObject = Instantiate(placeableObjectPrefab);
+                    currentPlaceableObject = TemplateController.Instance.TestCreate("Fundation");
+                    currentPlaceableBeyondComponent = currentPlaceableObject.GetComponent<BeyondComponent>();
                     setCanPlace(false);
-                    currentPlaceableObject.GetComponent<BoxCollider>().enabled = false;
-                    currentPlaceableBeyondComponent = currentPlaceableObject.AddComponent<BeyondComponent>();
-                    currentPlaceableBeyondComponent.createAllFeatures();
-                    currentPlaceableBeyondComponent.unsetObjectGroup();
                 }
                 else
                 {
