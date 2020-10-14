@@ -3,34 +3,34 @@ using UnityEngine;
 
 namespace Beyond
 {
-    public class ObjectGroup
+    public class BeyondGroup
     {
         public string name { get; protected set;}
-        public List<BeyondObject> objectList { get; protected set; }
-        public ObjectGroup(string s)
+        public List<BeyondComponent> componentList { get; protected set; }
+        public BeyondGroup(string s)
         {
             name = s;
-            objectList = new List<BeyondObject>();
+            componentList = new List<BeyondComponent>();
         }
 
-        public bool addBeyondObject(BeyondObject bo)
+        public bool addBeyondComponent(BeyondComponent bc)
         {
-            if (objectList.Contains(bo))
+            if (componentList.Contains(bc))
             {
                 return false;
             }
             else
             {
-                objectList.Add(bo);
+                componentList.Add(bc);
                 return true;
             }
         }
 
-        public bool removeBeyondObject(BeyondObject bo)
+        public bool removeBeyondComponent(BeyondComponent bc)
         {
-            if (objectList.Contains(bo))
+            if (componentList.Contains(bc))
             {
-                objectList.Remove(bo);
+                componentList.Remove(bc);
                 return true;
             }
             else

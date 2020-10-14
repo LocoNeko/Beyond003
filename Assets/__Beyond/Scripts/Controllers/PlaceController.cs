@@ -27,18 +27,18 @@ namespace Beyond
         }
 
 
-        public void CreateNewObjectGroup(BeyondObject bo=null , string name=null)
+        public void CreateNewBeyondGroup(BeyondComponent bc=null , string name=null)
         {
             if (name == null)
             { // Auto give name
-                name = String.Format("Group {0:0000}",place.ObjectGroups.Count);
+                name = String.Format("Group {0:0000}",place.beyondGroups.Count);
             }
-            ObjectGroup group = new ObjectGroup(name);
-            if (bo!=null)
+            BeyondGroup group = new BeyondGroup(name);
+            if (bc!=null)
             {
-                group.addBeyondObject(bo);
+                group.addBeyondComponent(bc);
             }
-            place.ObjectGroups.Add(group);
+            place.beyondGroups.Add(group);
         }
 
         /// <summary>

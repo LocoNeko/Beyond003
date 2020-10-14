@@ -14,7 +14,7 @@ namespace Beyond
         public int Width { get; protected set; }
         public int Height { get; protected set; }
         public int MinLevel { get; protected set; }
-        public List<ObjectGroup> ObjectGroups { get; protected set; }
+        public List<BeyondGroup> beyondGroups { get; protected set; }
 
         public Place(string s = "A test place", int l = 1000, int w = 1000, int h = 200, int ml = -20)
         {
@@ -25,7 +25,7 @@ namespace Beyond
             Width = w;
             Height = h;
             MinLevel = ml;
-            ObjectGroups = new List<ObjectGroup>();
+            beyondGroups = new List<BeyondGroup>();
             Debug.Log("New place created");
         }
 

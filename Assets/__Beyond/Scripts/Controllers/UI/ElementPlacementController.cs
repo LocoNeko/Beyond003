@@ -20,8 +20,13 @@ namespace Beyond
         private KeyCode newObjectHotKey = KeyCode.U;
         private KeyCode lowerTerrainHotKey = KeyCode.T;
 
+        /* TODO : There are 3 states for any objects :
+         * - floating around currentPlaceableObject
+         * - TODO: placed as a blueprint (under construction)
+         * - Placed for good
+         */
         private GameObject currentPlaceableObject;
-        private BeyondObject currentPlaceableBeyondObject;
+        private BeyondComponent currentPlaceableBeyondComponent;
         private float mouseWheelRotation;
         public float heightOffset = -1f;
         private bool canPlace;
@@ -76,7 +81,7 @@ namespace Beyond
                     // So I need a function that checks whether a thin box located slightly above the object collides with terrain
                     // TODO : don't hardcode this 2.5f
                     //if (height - pointHit.y <= 2.5f)
-                    if (height - currentPlaceableBeyondObject.transform.position.y <= 2.5f)
+                    if (height - currentPlaceableBeyondComponent.transform.position.y <= 2.5f)
                     {
                         setCanPlace(!ObjectInsideAnother());
                         //TODO Don't I need to unsnap when I can't place the object ?
@@ -108,20 +113,20 @@ namespace Beyond
             //TO DO : don't hardcode 10 here
             Vector3 point = currentPlaceableObject.transform.position + 10 * Vector3.up;
             RaycastHit hitInfo;
-            Physics.BoxCast(point, currentPlaceableBeyondObject.castBox, Vector3.down, out hitInfo, currentPlaceableObject.transform.rotation);
+            Physics.BoxCast(point, currentPlaceableBeyondComponent.castBox, Vector3.down, out hitInfo, currentPlaceableObject.transform.rotation);
             return hitInfo.point.y;
         }
 
         private bool BaseIsInsideTerrain()
         {
-            if (currentPlaceableBeyondObject!=null)
+            if (currentPlaceableBeyondComponent!=null)
             {
-                foreach (Anchor a in currentPlaceableBeyondObject.anchors)
-                { // Check all anchors tagged as "InTerrain"
-                    if (a.tag == "InTerrain")
+                foreach (Feature f in currentPlaceableBeyondComponent.features)
+                { // Check all features tagged as "InTerrain"
+                    if (f.tag == "InTerrain")
                     {
                         RaycastHit hitInfo;
-                        if (Physics.Raycast(a.gameObject.transform.position, Vector3.down, out hitInfo, 50f, PlaceController.Instance.terrainLayerMask))
+                        if (Physics.Raycast(f.gameObject.transform.position, Vector3.down, out hitInfo, 50f, PlaceController.Instance.terrainLayerMask))
                         { // If I hit the terrain while casting a ray down, this can only mean I'm not inside it
                             //Debug.Log("Base is not inside terrain");
                             return false;
@@ -133,14 +138,14 @@ namespace Beyond
         }
         private bool ObjectInsideAnother()
         {
-            if (currentPlaceableBeyondObject!=null)
+            if (currentPlaceableBeyondComponent!=null)
             {
-                if (currentPlaceableBeyondObject.objectsColliding.Count>0)
+                if (currentPlaceableBeyondComponent.objectsColliding.Count>0)
                 {
-                    //Debug.Log("Colliding with placed object " + currentPlaceableBeyondObject.objectsCollidingString());
+                    //Debug.Log("Colliding with placed object " + currentPlaceableBeyondComponent.objectsCollidingString());
                 }
-                //Debug.Log("ObjectInsideAnother is "+ currentPlaceableBeyondObject.collidingWithBuilding()+" collided with "+ currentPlaceableBeyondObject.objectsCollidingString());
-                return currentPlaceableBeyondObject.collidingWithBuilding(false);
+                //Debug.Log("ObjectInsideAnother is "+ currentPlaceableBeyondComponent.collidingWithBuilding()+" collided with "+ currentPlaceableBeyondComponent.objectsCollidingString());
+                return currentPlaceableBeyondComponent.collidingWithBuilding(false);
             }
             return false;
         }
@@ -148,47 +153,47 @@ namespace Beyond
         private void SnapToPlacedObjects()
         {
             /* 
-            * 1 - Get all anchorsColliding GameObjects
+            * 1 - Get all featuresColliding GameObjects
             * 2 - Get all their parent placedObjects
-            * 3 - Go through all the Anchors of the placedObjects, ignoring those that we didn't collide with
-            * = By PlacedObjects, we now have a list of Anchors, and we know they were collided with
-            * 4 - Go through those anchors to get all canLinkTo that we find in 2+ anchors
+            * 3 - Go through all the Features of the placedObjects, ignoring those that we didn't collide with
+            * = By PlacedObjects, we now have a list of Features, and we know they were collided with
+            * 4 - Go through those features to get all canLinkTo that we find in 2+ features
             * 5 - get the corresponding neighbouring cell centres by using neighbourCentre(GameObject go , Vector3Int direction)
             */
-            if (currentPlaceableBeyondObject != null)
+            if (currentPlaceableBeyondComponent != null)
             {
-                // 1 - Get all anchorsColliding GameObjects
-                IEnumerable<GameObject> anchorsColliding = currentPlaceableBeyondObject.collidingWithAnchors();
+                // 1 - Get all featuresColliding GameObjects
+                IEnumerable<GameObject> featuresColliding = currentPlaceableBeyondComponent.collidingWithFeatures();
                 // 2 - Get all their parent placedObjects
                 HashSet<GameObject> collidedPlacedObjects = new HashSet<GameObject>();
                 HashSet<Vector3> uniqueNeighbourCentres = new HashSet<Vector3>();
                 Dictionary<Vector3,GameObject> placedObjectAtCentre = new Dictionary<Vector3, GameObject>();
-                foreach (GameObject anchorCollided in anchorsColliding)
+                foreach (GameObject featureCollided in featuresColliding)
                 {
-                    collidedPlacedObjects.Add(anchorCollided.transform.parent.gameObject);
+                    collidedPlacedObjects.Add(featureCollided.transform.parent.gameObject);
                 }
-                // 3 - Go through all the Anchors of the placedObjects, ignoring those that we didn't collide with
+                // 3 - Go through all the Features of the placedObjects, ignoring those that we didn't collide with
                 foreach (GameObject collidedPlacedObject in collidedPlacedObjects)
                 {
-                    BeyondObject bo = collidedPlacedObject.GetComponent<BeyondObject>();
-                    HashSet<Anchor> anchorsOfCollidedObject = new HashSet<Anchor>();
+                    BeyondComponent bc = collidedPlacedObject.GetComponent<BeyondComponent>();
+                    HashSet<Feature> featuresOfCollidedObject = new HashSet<Feature>();
                     HashSet<Vector3Int> uniqueNeighbour = new HashSet<Vector3Int>();
-                    // Get a list of Anchors for this collidedPlacedObject
-                    foreach (Anchor a in bo.anchors)
+                    // Get a list of Features for this collidedPlacedObject
+                    foreach (Feature f in bc.features)
                     {
-                        if (anchorsColliding.Contains<GameObject>(a.gameObject))
-                        { // only keep anchors we collided with
-                            anchorsOfCollidedObject.Add(a);
+                        if (featuresColliding.Contains<GameObject>(f.gameObject))
+                        { // only keep features we collided with
+                            featuresOfCollidedObject.Add(f);
                         }
                     }
-                    // 4 - Go through those anchors to get all canLinkTo that we find in 2 + anchors
-                    foreach (Anchor a2 in anchorsOfCollidedObject)
+                    // 4 - Go through those features to get all canLinkTo that we find in 2+ features
+                    foreach (Feature f2 in featuresOfCollidedObject)
                     {
-                        foreach (Vector3Int v in a2.canLinkTo)
+                        foreach (Vector3Int v in f2.canLinkTo)
                         {
-                            foreach (Anchor a3 in anchorsOfCollidedObject)
+                            foreach (Feature f3 in featuresOfCollidedObject)
                             {
-                                if ((a2 != a3) && (a3.canLinkTo.Contains(v)))
+                                if ((f2 != f3) && (f3.canLinkTo.Contains(v)))
                                 {
                                     uniqueNeighbour.Add(v);
                                 }
@@ -218,10 +223,10 @@ namespace Beyond
                             d = d2;
                             currentPlaceableObject.transform.position = candidateCentre;
                             currentPlaceableObject.transform.rotation = placedObjectAtCentre[candidateCentre].transform.rotation;
-                            ObjectGroup og = placedObjectAtCentre[candidateCentre].GetComponent<BeyondObject>().objectGroup;
-                            if (og!=null)
+                            BeyondGroup group = placedObjectAtCentre[candidateCentre].GetComponent<BeyondComponent>().beyondGroup;
+                            if (group!=null)
                             {
-                                currentPlaceableBeyondObject.setObjectGroup(og);
+                                currentPlaceableBeyondComponent.setObjectGroup(group);
                             }
                         }
                     }
@@ -230,7 +235,7 @@ namespace Beyond
                 else
                 {
                     snapped = false;
-                    currentPlaceableBeyondObject.unsetObjectGroup();
+                    currentPlaceableBeyondComponent.unsetObjectGroup();
                 }
             }
         }
@@ -273,17 +278,18 @@ namespace Beyond
                 {
                     Renderer r = currentPlaceableObject.GetComponent<Renderer>();
                     r.material = placeableObjectPrefab.GetComponent<Renderer>().sharedMaterial;
-                    // TODO : Really need to think hard about this.
+                    // TODO : Really need to think hard about this: will the box collider as trigger really be a general case for all elements ?
                     currentPlaceableObject.GetComponent<BoxCollider>().isTrigger = false;
                     currentPlaceableObject.GetComponent<BoxCollider>().enabled = true;
                     currentPlaceableObject.name = "placedObject_" + (nbObjectsPlaced++);
-                    if(currentPlaceableBeyondObject.objectGroup==null)
+                    if(currentPlaceableBeyondComponent.beyondGroup==null)
                     {
                         PlaceController pc = PlaceController.Instance;
-                        pc.CreateNewObjectGroup(currentPlaceableBeyondObject);
+                        pc.CreateNewBeyondGroup(currentPlaceableBeyondComponent);
                     }
                     currentPlaceableObject = null;
                     snapped = false;
+                    //TODO : If SHIFT is pressed, allow queuing of objects to be placed
                 }
                 else
                 {
@@ -301,9 +307,9 @@ namespace Beyond
                     currentPlaceableObject = Instantiate(placeableObjectPrefab);
                     setCanPlace(false);
                     currentPlaceableObject.GetComponent<BoxCollider>().enabled = false;
-                    currentPlaceableBeyondObject = currentPlaceableObject.AddComponent<BeyondObject>();
-                    currentPlaceableBeyondObject.createAllAnchors();
-                    currentPlaceableBeyondObject.unsetObjectGroup();
+                    currentPlaceableBeyondComponent = currentPlaceableObject.AddComponent<BeyondComponent>();
+                    currentPlaceableBeyondComponent.createAllFeatures();
+                    currentPlaceableBeyondComponent.unsetObjectGroup();
                 }
                 else
                 {
