@@ -7,7 +7,7 @@ namespace Beyond
     {
         Place place;
         // This is how many World unit there are in one "cell"
-        public static readonly float cellSize = 10f;
+        public static readonly float cellSize = 1f;
         public static PlaceController Instance;
         public LayerMask buildingLayerMask;
         public LayerMask terrainLayerMask;
@@ -37,6 +37,7 @@ namespace Beyond
             if (bc!=null)
             {
                 group.addBeyondComponent(bc);
+                bc.setObjectGroup(group);
             }
             place.beyondGroups.Add(group);
         }

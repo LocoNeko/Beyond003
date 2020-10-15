@@ -38,5 +38,19 @@ namespace Beyond
                 return false;
             }
         }
+
+        public bool hasBeyondComponentAtCoordinate(Vector3 p , float tolerance=0.01f)
+        {
+            foreach(BeyondComponent bc in componentList)
+            {
+                //This is the position of the GameObject this BeyondComponent is attached to, corrected by the offset (if any)
+                Vector3 bcp = bc.transform.gameObject.transform.position - bc.pivotOffset;
+                if (Vector3.Distance(p , bcp) < tolerance)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
     }
 }

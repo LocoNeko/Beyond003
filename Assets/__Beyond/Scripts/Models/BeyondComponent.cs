@@ -11,13 +11,27 @@ namespace Beyond
     // This script is attached to all objects specific to Beyond that can be created & placed
     public class BeyondComponent : MonoBehaviour
     {
+        //TODO : maybe this can be in TemplateController instead (more robust)
+        public static List<string> featureTags = new List<string>(){"InTerrain" , "SnapH" , "SnapV"};
         public Template template;
-        //TODO : Use this to determine what it should collide with, snap with, etc
+        //TODO : Use this to determine what the parent object should collide with, snap with, etc
         public BC_State state { get; protected set; }
         public List<Feature> features { get; protected set; }
         public Vector3 castBox { get; protected set; }
+        public Vector3 pivotOffset { get; protected set; }
         public HashSet<GameObject> objectsColliding { get; protected set; } // Objects this BO is colliding with
         public BeyondGroup beyondGroup;
+
+        /// <summary>
+        /// Whether or not an object tag means the object is based on a feature
+        /// </summary>
+        /// <param name="t"></param>
+        /// <returns></returns>
+        private static bool tagIsFeatureTag(string t)
+        {
+            return featureTags.Contains(t);
+        }
+
         public BeyondComponent()
         {
             state = BC_State.Ghost;
@@ -31,6 +45,7 @@ namespace Beyond
             template = t;
             castBox = t.castBox;
             features = t.features;
+            pivotOffset = t.pivotOffset;
         }
 
         public void setObjectGroup (BeyondGroup g)
@@ -52,7 +67,7 @@ namespace Beyond
         // TODO : clean this so the creation of a BeyondComponent generates all needed features & castbox from its template
         public void createAllFeatures()
         {
-            castBox = new Vector3(5f, 0.1f, 5f);
+            castBox = template.castBox;
             foreach (Feature ft in template.features)
             { // Create the features based on the template's features. Can't do features = template.features as it make Unity create distinct instances of GameObjects below (took me 3 hours to figure this bug out)
                 Feature f = new Feature(ft.offset, ft.tag, ft.snapToTags);
@@ -65,16 +80,43 @@ namespace Beyond
             int i = 0;
             foreach (Feature f in features)
             {
+                CreateGameObjectForFeature(f , i);
+                i++;
+            }
+        }
+
+        private void CreateGameObjectForFeature(Feature f , int i)
+        {
+            if (tagRequiresObject(f.tag))
+            {
+                //TO DO : all this coding depends on the feature's tag
+                // If the tag requires a gameObject for this feature, create it here
                 GameObject go = new GameObject();
                 go.transform.parent = transform;
                 go.transform.localPosition = f.offset;
-                go.name = "Feature" + i++ + "_" + transform.gameObject.name;
+                go.name = transform.gameObject.name + "_Feature_" + i;
                 go.tag = f.tag;
-                f.setGameObject(go); // For features that are represented by a gameObject, set it here
+                f.setGameObject(go);
                 // Add a SphereCollider to the feature for snapping
+                // If the tag requires a collider added to the gameObject's feature, create it here
+                generateObjectCollider(f.tag, go);
+            }
+        }
+
+
+        private bool tagRequiresObject(string tag)
+        {
+            // TODO move hardcoding to some kind of tag controller
+            return tag == "InTerrain";
+        }
+        private void generateObjectCollider(string tag, GameObject go)
+        {
+            // TODO move hardcoding to some kind of tag controller
+            if (tag=="InTerrain")
+            {
                 SphereCollider sc = go.AddComponent<SphereCollider>();
                 sc.isTrigger = true;
-                sc.radius = 2.5f;
+                sc.radius = 0.25f;
             }
         }
 
@@ -92,6 +134,7 @@ namespace Beyond
                 // TODO : really ? looks spaghetti to me
                 if (g.layer == PlaceController.Instance.buildingLayerMask && (checkSameGroup || (!checkSameGroup && g.GetComponent<BeyondComponent>().beyondGroup!=beyondGroup)))
                 {
+                    //Debug.Log("Collided with building");
                     return true;
                 }
             }
@@ -103,9 +146,13 @@ namespace Beyond
             return String.Join(",", objectsColliding);
         }
 
-        public IEnumerable<GameObject> collidingWithFeatures()
+        /// <summary>
+        /// Returns all GameObject that are based on a feature (based on their tag, like "InTerrain" or "SnapH")
+        /// </summary>
+        /// <returns></returns>
+        public IEnumerable<GameObject> collidingWithFeatureGameObjects()
         {
-            return objectsColliding.Where<GameObject>(g => g.tag == "InTerrain");
+            return objectsColliding.Where<GameObject>(g => tagIsFeatureTag(g.tag));
         }
 
         void OnTriggerExit(Collider c)

@@ -4,13 +4,7 @@ using UnityEngine;
 
 namespace Beyond
 {
-    /* TODO : This is a bad name as this could be points in space, colliders, textures, even sound...
-     * Call this :
-     * - SubComponent ? awful...
-     * - Feature
-     * - Trait
-     * - ComponentFeature
-     */
+
     public class Feature
     {
         public Vector3 offset { get; protected set;  } // Where is the feature located relative to the object's centre

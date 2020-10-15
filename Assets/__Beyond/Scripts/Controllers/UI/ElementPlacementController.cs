@@ -25,7 +25,7 @@ namespace Beyond
         private GameObject currentPlaceableObject;
         private BeyondComponent currentPlaceableBeyondComponent;
         private float mouseWheelRotation;
-        public float heightOffset = -1f;
+        float heightOffset = -0.1f;
         private bool canPlace;
         Vector3 mousePosition;
         public bool snapped;
@@ -78,13 +78,15 @@ namespace Beyond
                     // So I need a function that checks whether a thin box located slightly above the object collides with terrain
                     // TODO : don't hardcode this 2.5f
                     //if (height - pointHit.y <= 2.5f)
-                    if (height - currentPlaceableBeyondComponent.transform.position.y <= 2.5f)
+                    //TODO : on occasions, this can be off by just a tiny bit (I got 0.2500005f once and couldn't snap)
+                    if (height - currentPlaceableBeyondComponent.transform.position.y <= 0.250001f)
                     {
                         setCanPlace(!ObjectInsideAnother());
                         //TODO Don't I need to unsnap when I can't place the object ?
                     }
                     else
                     {
+                        //Debug.Log("snapped inside terrain, unsnapping. height - currentPlaceableBeyondComponent.transform.position.y="+ (height - currentPlaceableBeyondComponent.transform.position.y));
                         setCanPlace(false);
                         snapped = false;
                     }
@@ -107,7 +109,7 @@ namespace Beyond
 
         private float GetHeightForClearTop()
         {
-            //TO DO : don't hardcode 10 here
+            //TO DO : don't hardcode 10 here,I should do better than this
             Vector3 point = currentPlaceableObject.transform.position + 10 * Vector3.up;
             RaycastHit hitInfo;
             Physics.BoxCast(point, currentPlaceableBeyondComponent.castBox, Vector3.down, out hitInfo, currentPlaceableObject.transform.rotation);
@@ -150,7 +152,7 @@ namespace Beyond
         private void SnapToPlacedObjects()
         {
             /* 
-            * 1 - Get all featuresColliding GameObjects
+            * 1 - Get all featuresGameObjectsColliding GameObjects
             * 2 - Get all their parent placedObjects
             * 3 - Go through all the Features of the placedObjects, ignoring those that we didn't collide with
             * = By PlacedObjects, we now have a list of Features, and we know they were collided with
@@ -159,14 +161,14 @@ namespace Beyond
             */
             if (currentPlaceableBeyondComponent != null)
             {
-                // 1 - Get all featuresColliding GameObjects
-                IEnumerable<GameObject> featuresColliding = currentPlaceableBeyondComponent.collidingWithFeatures();
+                // 1 - Get all featuresGameObjectsColliding GameObjects
+                IEnumerable<GameObject> featuresGameObjectsColliding = currentPlaceableBeyondComponent.collidingWithFeatureGameObjects();
                 // 2 - Get all their parent placedObjects
                 HashSet<GameObject> collidedPlacedObjects = new HashSet<GameObject>();
                 HashSet<Vector3> uniqueNeighbourCentres = new HashSet<Vector3>();
                 Dictionary<Vector3,GameObject> placedObjectAtCentre = new Dictionary<Vector3, GameObject>();
-                // Put the parent of the collided feature in collidedPlacedObjects
-                foreach (GameObject featureCollided in featuresColliding)
+                // Put the parent GameObject of the collided feature's GameObject in collidedPlacedObjects
+                foreach (GameObject featureCollided in featuresGameObjectsColliding)
                 {
                     collidedPlacedObjects.Add(featureCollided.transform.parent.gameObject);
                 }
@@ -179,12 +181,13 @@ namespace Beyond
                     // Get a list of Features for this collidedPlacedObject
                     foreach (Feature f in bc.features)
                     {
-                        if (featuresColliding.Contains<GameObject>(f.gameObject))
+                        if (featuresGameObjectsColliding.Contains<GameObject>(f.gameObject))
                         { // only keep features we collided with
                             featuresOfCollidedObject.Add(f);
                         }
                     }
                     // 4 - Go through those features to get all canLinkTo that we find in 2+ features
+                    //TODO : This might be more complexe than that, as some Object might give links based on only one feature (e.g. I can snap a wall to another based on just 1)
                     foreach (Feature f2 in featuresOfCollidedObject)
                     {
                         foreach (Vector3Int v in f2.canLinkTo)
@@ -193,7 +196,15 @@ namespace Beyond
                             {
                                 if ((f2 != f3) && (f3.canLinkTo.Contains(v)))
                                 {
-                                    uniqueNeighbour.Add(v);
+                                    BeyondGroup bg = bc.beyondGroup;
+                                    if (bg.hasBeyondComponentAtCoordinate(PlaceController.Instance.neighbourCentre(collidedPlacedObject, v)))
+                                    {
+                                        Debug.Log("Group "+bg.name+" already has an object here");
+                                    }
+                                    else
+                                    {
+                                        uniqueNeighbour.Add(v);
+                                    }
                                 }
                             }
                         }
@@ -263,7 +274,8 @@ namespace Beyond
                 {
                     heightOffset -= 0.1f;
                 }
-                heightOffset = Mathf.Clamp(heightOffset, -2.5f, 0f);
+                //TODO : clamp based on placebaleobject's height
+                heightOffset = Mathf.Clamp(heightOffset, -0.2f, 0f);
                 return true;
             }
             return false;
@@ -284,11 +296,12 @@ namespace Beyond
                     currentPlaceableObject.name = "placedObject_" + (nbObjectsPlaced++);
                     if(currentPlaceableBeyondComponent.beyondGroup==null)
                     {
-                        PlaceController pc = PlaceController.Instance;
-                        pc.CreateNewBeyondGroup(currentPlaceableBeyondComponent);
+                        PlaceController.Instance.CreateNewBeyondGroup(currentPlaceableBeyondComponent);
                     }
                     currentPlaceableObject = null;
                     snapped = false;
+                    //TODO : check if this behaviour is good by default. It creates a new placeable object as soon as one is placed
+                    createNewPlaceableObject();
                     //TODO : If SHIFT is pressed, allow queuing of objects to be placed
                 }
                 else
@@ -302,16 +315,7 @@ namespace Beyond
         {
             if (Input.GetKeyDown(newObjectHotKey))
             {
-                if (currentPlaceableObject == null)
-                {
-                    currentPlaceableObject = TemplateController.Instance.TestCreate("Fundation");
-                    currentPlaceableBeyondComponent = currentPlaceableObject.GetComponent<BeyondComponent>();
-                    setCanPlace(false);
-                }
-                else
-                {
-                    Destroy(currentPlaceableObject);
-                }
+                createNewPlaceableObject();
             }
             // TO DO : This needs a lot of work, and to understand terrain resolution to properly translate World -> terrain height map 
             if (Input.GetKeyDown(lowerTerrainHotKey))
@@ -339,6 +343,20 @@ namespace Beyond
                 */
             }
 
+        }
+
+        private void createNewPlaceableObject()
+        {
+            if (currentPlaceableObject == null)
+            {
+                currentPlaceableObject = TemplateController.Instance.CreateGameObject("Fundation");
+                currentPlaceableBeyondComponent = currentPlaceableObject.GetComponent<BeyondComponent>();
+                setCanPlace(false);
+            }
+            else
+            {
+                Destroy(currentPlaceableObject);
+            }
         }
 
         private void setCanPlace(bool b)

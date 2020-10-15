@@ -62,12 +62,12 @@
      <Compile Include="Assets\__Beyond\Scripts\Models\BeyondGroup.cs" />
      <Compile Include="Assets\__Beyond\Scripts\Controllers\UI\FreeCameraController.cs" />
      <Compile Include="Assets\__Beyond\Scripts\Controllers\UI\FirstPersonController.cs" />
+     <Compile Include="Assets\__Beyond\Scripts\Models\Feature.cs" />
      <Compile Include="Assets\__Beyond\Scripts\Models\Template.cs" />
      <Compile Include="Assets\__Beyond\Scripts\Models\GameTime.cs" />
      <Compile Include="Assets\__Beyond\Scripts\Controllers\PlaceController.cs" />
      <Compile Include="Assets\__Beyond\Scripts\Models\BeyondComponent.cs" />
      <Compile Include="Assets\__Beyond\Scripts\Controllers\UI\ElementPlacementController.cs" />
-     <Compile Include="Assets\__Beyond\Scripts\Models\Feature.cs" />
      <None Include="Assets\External\Samples\Terrain Tools\0.1.0-preview\Terrain Assets\ThirdPartyNotices.txt" />
  <Reference Include="Unity.Timeline.Editor">
  <HintPath>C:/Users/user/Desktop/Beyond/Beyond003/Library/ScriptAssemblies/Unity.Timeline.Editor.dll</HintPath>
