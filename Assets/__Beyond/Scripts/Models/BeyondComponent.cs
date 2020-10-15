@@ -19,7 +19,7 @@ namespace Beyond
         public List<Feature> features { get; protected set; }
         public Vector3 castBox { get; protected set; }
         public Vector3 pivotOffset { get; protected set; }
-        public HashSet<GameObject> objectsColliding { get; protected set; } // Objects this BO is colliding with
+        public HashSet<GameObject> objectsTriggered { get; protected set; } // Objects this BO is colliding with
         public BeyondGroup beyondGroup;
 
         /// <summary>
@@ -37,7 +37,7 @@ namespace Beyond
             state = BC_State.Ghost;
             beyondGroup = null;
             features = new List<Feature>();
-            objectsColliding = new HashSet<GameObject>();
+            objectsTriggered = new HashSet<GameObject>();
         }
 
         public void initialise(Template t)
@@ -120,22 +120,17 @@ namespace Beyond
             }
         }
 
-        void OnTriggerEnter(Collider c)
-        {
-            //Debug.Log("OnTriggerEnter "+c.gameObject.name+", isTrigger="+c.isTrigger);
-            objectsColliding.Add(c.gameObject);
-        }
 
-
-        public bool collidingWithBuilding(bool checkSameGroup=true)
+        public bool collidingWithBuilding(bool checkSameGroup = true)
         {
-            foreach (GameObject g in objectsColliding)
+            foreach (GameObject g in objectsTriggered)
             {
-                // TODO : really ? looks spaghetti to me
-                if (g.layer == PlaceController.Instance.buildingLayerMask && (checkSameGroup || (!checkSameGroup && g.GetComponent<BeyondComponent>().beyondGroup!=beyondGroup)))
+                if (g.layer == LayerMask.NameToLayer("Buildings"))
                 {
-                    //Debug.Log("Collided with building");
-                    return true;
+                    if (checkSameGroup || g.GetComponent<BeyondComponent>().beyondGroup != beyondGroup)
+                    {
+                        return true;
+                    }
                 }
             }
             return false;
@@ -143,7 +138,7 @@ namespace Beyond
 
         public string objectsCollidingString()
         {
-            return String.Join(",", objectsColliding);
+            return String.Join(",", objectsTriggered);
         }
 
         /// <summary>
@@ -152,19 +147,25 @@ namespace Beyond
         /// <returns></returns>
         public IEnumerable<GameObject> collidingWithFeatureGameObjects()
         {
-            return objectsColliding.Where<GameObject>(g => tagIsFeatureTag(g.tag));
+            return objectsTriggered.Where<GameObject>(g => tagIsFeatureTag(g.tag));
         }
 
-        void OnTriggerExit(Collider c)
-        {
-            objectsColliding.Remove(c.gameObject);
-        }
-
-        public List<Vector3Int> neighbourLinks(Feature f1 , Feature f2)
+        public List<Vector3Int> neighbourLinks(Feature f1, Feature f2)
         {
             List<Vector3Int> list1 = f1.canLinkTo;
             List<Vector3Int> list2 = f2.canLinkTo;
             return list1.Intersect<Vector3Int>(list2).ToList();
         }
+
+        void OnTriggerEnter(Collider c)
+        {
+            objectsTriggered.Add(c.gameObject);
+        }
+
+        void OnTriggerExit(Collider c)
+        {
+            objectsTriggered.Remove(c.gameObject);
+        }
+
     }
 }

@@ -9,8 +9,6 @@ namespace Beyond
         // This is how many World unit there are in one "cell"
         public static readonly float cellSize = 1f;
         public static PlaceController Instance;
-        public LayerMask buildingLayerMask;
-        public LayerMask terrainLayerMask;
 
         void OnEnable()
         {

@@ -43,11 +43,15 @@ namespace Beyond
         {
             foreach(BeyondComponent bc in componentList)
             {
-                //This is the position of the GameObject this BeyondComponent is attached to, corrected by the offset (if any)
-                Vector3 bcp = bc.transform.gameObject.transform.position - bc.pivotOffset;
-                if (Vector3.Distance(p , bcp) < tolerance)
+                //TODO : I should not need to do that, but got a bug about trying to access a destroyed bc when snapping
+                if (bc!=null)
                 {
-                    return true;
+                    //This is the position of the GameObject this BeyondComponent is attached to, corrected by the offset (if any)
+                    Vector3 bcp = bc.transform.gameObject.transform.position - bc.pivotOffset;
+                    if (Vector3.Distance(p, bcp) < tolerance)
+                    {
+                        return true;
+                    }
                 }
             }
             return false;
