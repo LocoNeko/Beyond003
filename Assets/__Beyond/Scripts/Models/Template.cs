@@ -12,13 +12,25 @@ namespace Beyond
         public Vector3 castBox { get; protected set; }
         //The pivotOffset tells us where the cell's centre is compared to the object's centre
         public Vector3 pivotOffset { get; protected set; }
+        public List<Vector3Int> cells { get; protected set; }
         public GameObject prefab { get; protected set; }
+        public Constraints constraints { get; protected set; }
 
-        public Template(string name, Vector3 castBox , GameObject prefab_go , Vector3? pivotOffset=null)
+        public Template(string name, Vector3 castBox , GameObject prefab_go , Constraints constraints , Vector3? pivotOffset=null , List<Vector3Int> cells=null)
         {
             this.name = name;
             this.castBox = castBox;
+            if (cells!=null)
+            {
+                this.cells = new List<Vector3Int>() ;
+                foreach (Vector3Int v in cells)
+                {
+                    this.cells.Add(v) ;
+                }
+            }
             this.prefab = prefab_go;
+            this.constraints = constraints ;
+
             if (pivotOffset!=null)
             {
                 this.pivotOffset = (Vector3)pivotOffset;

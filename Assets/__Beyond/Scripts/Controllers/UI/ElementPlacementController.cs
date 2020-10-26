@@ -15,12 +15,11 @@ namespace Beyond
         [SerializeField]
         private KeyCode newFundationHotKey = KeyCode.U;
         private KeyCode newWallHotKey = KeyCode.I;
-        private KeyCode newLevelHotKey = KeyCode.O;
+        private KeyCode newFloorHotKey = KeyCode.O;
         private KeyCode newWallholeHotKey = KeyCode.P;
         private GameObject currentPlaceableObject;
         private BeyondComponent currentPlaceableBeyondComponent;
         private float mouseWheelRotation;
-        float heightOffset = 0f;
 
         public float groupSnapTolerance = 0.2f;
         Vector3 mousePosition;
@@ -44,7 +43,7 @@ namespace Beyond
                     // Make the placeable red or green based on whether it can be placed
                     //TODO: this belong inside the BeyondCOmponent itself
                     Renderer r = currentPlaceableObject.GetComponent<Renderer>();
-                    r.material.color = (ConstraintController.CanPlace(currentPlaceableObject , heightOffset) ? Color.green : Color.red);
+                    r.material.color = (ConstraintController.CanPlace(currentPlaceableObject) ? Color.green : Color.red);
                     ReleaseIfClicked();
                 }
             }
@@ -66,8 +65,8 @@ namespace Beyond
             if (Physics.Raycast(ray, out hitInfo, 250f, ConstraintController.getTerrainMask()))
             {
                 Vector3 pointHit = hitInfo.point;
-                Vector3 position = ConstraintController.GetValidPositionFromMouse(currentPlaceableObject , pointHit , ref heightOffset);
-                position.y += heightOffset;
+                Vector3 position = ConstraintController.GetValidPositionFromMouse(currentPlaceableObject , pointHit);
+                position.y += UIController.Instance.heightOffset;
                 //If I'm snapped, only move if I'm a bit far from my current position
                 // TODO : see hardcoded bit in MovePlaceableObject: Can I give better offsets for mouse positionning ?
                 if (currentPlaceableBeyondComponent.beyondGroup!=null)
@@ -214,9 +213,9 @@ namespace Beyond
             {
                 CreateNewPlaceableObject("Wall");
             }
-            if (Input.GetKeyDown(newLevelHotKey))
+            if (Input.GetKeyDown(newFloorHotKey))
             {
-                CreateNewPlaceableObject("Level");
+                CreateNewPlaceableObject("Floor");
             }
             if (Input.GetKeyDown(newWallholeHotKey))
             {
@@ -229,7 +228,7 @@ namespace Beyond
             if (currentPlaceableObject == null)
             {
                 Template template = TemplateController.Instance.templates[templateName];
-                heightOffset=0;
+                UIController.Instance.SetHeighOffset(0);
                 //TODO : this will be inside the template controller.
                 currentPlaceableObject = Instantiate(template.prefab);
                 //TODO : need to experiment with BoxColldier & trigger
@@ -247,7 +246,7 @@ namespace Beyond
         {
             if (Input.GetMouseButtonDown(0))
             {
-                if (ConstraintController.CanPlace(currentPlaceableObject , heightOffset))
+                if (ConstraintController.CanPlace(currentPlaceableObject))
                 {
                     // Set the material back to the prefab's material to get rid of the green or red colours
                     currentPlaceableObject.GetComponent<Renderer>().material = TemplateController.prefabMaterial(currentPlaceableBeyondComponent.template);
@@ -290,11 +289,11 @@ namespace Beyond
             {
                 if (Input.mouseScrollDelta.y>0)
                 {
-                    heightOffset += 0.1f;
+                    UIController.Instance.SetHeighOffset(0 , 0.1f) ;
                 }
                 else if (Input.mouseScrollDelta.y < 0)
                 {
-                    heightOffset -= 0.1f;
+                    UIController.Instance.SetHeighOffset(0 , -0.1f);
                 }
                 return true;
             }

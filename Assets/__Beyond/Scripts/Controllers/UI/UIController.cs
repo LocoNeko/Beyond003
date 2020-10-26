@@ -13,6 +13,8 @@ namespace Beyond
         TextMeshProUGUI TM_CurrentPosition ;
         public BeyondGroup closestGroup {get; protected set;}
         public Vector3Int positionInGroup ;
+        public float heightOffset {get; protected set;}
+
 
         void Awake()
         {
@@ -29,6 +31,19 @@ namespace Beyond
             }
             Instance = this;
             setGameMode(gameMode.free);
+        }
+
+        public void SetHeighOffset(float h , float delta=0)
+        {
+            if (delta!=0)
+            {
+                heightOffset+=delta;
+
+            }
+            else
+            {
+                heightOffset = h ;
+            }
         }
 
 

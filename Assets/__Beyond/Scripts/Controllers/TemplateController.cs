@@ -23,27 +23,33 @@ namespace Beyond
         {
             templates.Add("Foundation" , new Template(
                 name: "Foundation" ,
-                castBox: new Vector3(0.5f, 0.25f, 0.5f) ,
+                castBox: new Vector3(0.5f, 0.55f, 0.5f) ,
                 prefab_go: Resources.Load<GameObject>("Prefabs/Foundation") ,
-                pivotOffset: new Vector3(0, -0.25f, 0f)
+                pivotOffset: new Vector3(0, -0.95f, 0f) ,
+                constraints: null
             ));
             templates.Add("Wall" , new Template(
                 name: "Wall" ,
-                castBox: new Vector3(0.5f, 1.25f, 0.1f) ,
+                castBox: new Vector3(0.5f, 1.45f, 0.1f) ,
                 prefab_go: Resources.Load<GameObject>("Prefabs/Wall") ,
-                pivotOffset: new Vector3(0f, 1.25f, -0.4f)
+                pivotOffset: new Vector3(0f, 1.05f, -0.4f) ,
+                cells: new List<Vector3Int>() {new Vector3Int(0,0,0), new Vector3Int(0,1,0), new Vector3Int(0,2,0)},
+                constraints: null
             ));
             templates.Add("Wallhole" , new Template(
                 name: "Wallhole" ,
                 castBox: new Vector3(0.5f, 1.25f, 0.1f) ,
                 prefab_go: Resources.Load<GameObject>("Prefabs/Wallhole") ,
-                pivotOffset: new Vector3(0f, 1.25f, -0.4f)
+                pivotOffset: new Vector3(0f, 1.25f, -0.4f) ,
+                cells: new List<Vector3Int>() {new Vector3Int(0,0,0), new Vector3Int(0,1,0), new Vector3Int(0,2,0)},
+                constraints: null
             ));
-            templates.Add("Level" , new Template(
-                name: "Level" ,
-                castBox: new Vector3(0.5f, 0.25f, 0.5f) ,
-                prefab_go: Resources.Load<GameObject>("Prefabs/Level") ,
-                pivotOffset: new Vector3(0, -0.25f, 0f)
+            templates.Add("Floor" , new Template(
+                name: "Floor" ,
+                castBox: new Vector3(0.5f, 0.05f, 0.5f) ,
+                prefab_go: Resources.Load<GameObject>("Prefabs/Floor") ,
+                pivotOffset: new Vector3(0, -0.45f, 0f) ,
+                constraints: null
             ));
             //TODO - Level
             //TODO - Roof

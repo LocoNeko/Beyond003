@@ -32,7 +32,7 @@ namespace Beyond
             return (layerMask == lm.value);
         }
 
-        public static bool CanPlace(GameObject go , float heightOffset)
+        public static bool CanPlace(GameObject go)
         {
             if (go == null) return false;
             BeyondComponent bc = go.GetComponent<BeyondComponent>();
@@ -40,7 +40,8 @@ namespace Beyond
             if (bc.template.name=="Foundation")
             {
                 // 1 - Foundations must be partially inside terrain
-                if (!BaseIsInTerrain(go.transform.position , bc.template.castBox , go.transform.rotation , heightOffset)) return false;
+                //if (!BaseIsInTerrain(go.transform.position , bc.template.castBox , go.transform.rotation , heightOffset)) return false;
+                if (!BaseInTerrain(bc)) return false;
             }
             else
             {
@@ -62,7 +63,7 @@ namespace Beyond
 
         //IMPORTANT : go.transform.position cannot be used since we're trying to place the GameObject through this method
         //rotation is fine (even if we just created the go, rotation will just be Quaternion.Identity)
-        public static Vector3 GetValidPositionFromMouse(GameObject go , Vector3 pointOnTerrain , ref float heightOffset)
+        public static Vector3 GetValidPositionFromMouse(GameObject go , Vector3 pointOnTerrain)
         {
             if (go == null) return pointOnTerrain;
             BeyondComponent bc = go.GetComponent<BeyondComponent>();
@@ -74,7 +75,7 @@ namespace Beyond
             if (bc.template.name=="Foundation")
             {
                 // A foundation should never have a negative height offset or it would go into the ground
-                heightOffset = Mathf.Max(heightOffset , 0);
+                UIController.Instance.SetHeighOffset(Mathf.Max(UIController.Instance.heightOffset , 0));
                 result = GetPointOnTerrain(go , pointOnTerrain) ;
             }
             // If GO is not a foundation, it has to snap with something so we don't care about Terrain
@@ -96,37 +97,6 @@ namespace Beyond
             result.y = hitInfo.point.y - bc.template.castBox.y;
 
             return result ;
-        }
-
-        // Is the bottom inside terrain by enough ?I also need to take the current heightOffset into accunt
-        public static bool BaseIsInTerrain(Vector3 p , Vector3 BoxCast , Quaternion q , float YOffset)
-        {
-            // Cast 4 boxes at each corner of the bottom of the object
-            // Their centres are: p + BoxCast in both X and Z, plus FoundationInTerrainBy / 2
-            for (float i = -1; i <= 2; i+=2)
-            {
-                for (float j = -1; j <= 2; j+=2)
-                {
-                    Vector3 point = (p + new Vector3((BoxCast.x - FoundationInTerrainBy/2) * i , - BoxCast.y + FoundationInTerrainBy/2 + YOffset , (BoxCast.z - FoundationInTerrainBy/2) * j ))  ;
-                    point = ElementPlacementController.RotateAroundPoint(point , p , q) ;
-                    /*
-                    The line above should be equivalent to the 3 lines below
-                    Vector3 direction = point - p ; // In order to apply the rotation, we need to find a vector from p to this new point
-                    direction = q * direction ; // we can then rotate that direction
-                    point = direction + p; // and apply it back, now fully rotated, to the original point p
-                    */
-
-                    Debug.DrawLine(point + (Vector3.down * YOffset), new Vector3(point.x , point.y- FoundationInTerrainBy/2 , point.z) , Color.yellow , 0.25f);
-
-                    // The height of the boxes' starting point must be offset by their height (BoxCast.y) and YOffset
-                    RaycastHit hitInfo;
-                    if (Physics.BoxCast(point - (Vector3.down * (BoxCast.y - YOffset)), BoxCast, Vector3.down, out hitInfo, q, Mathf.Infinity , getTerrainMask()))
-                    {
-                        return false ;
-                    }
-                }
-            }
-            return true ;
         }
 
         public static bool CanSnapToGroupHere(BeyondGroup group , Vector3Int here , Template t , Vector3 dFromPivot , out cellSide sts)
@@ -182,11 +152,11 @@ namespace Beyond
                     return true ; 
                 }
             }
-            if (t.name=="Level")
+            if (t.name=="Floor")
             {
                 sts = cellSide.Down ;
-                // must not have the same object (Level) here
-                if (IsTemplatePresentHere(group , here, "Level")) return false ;
+                // must not have the same object (Floor) here
+                if (IsTemplatePresentHere(group , here, "Floor")) return false ;
 
                 // There must be a Wall 3 cells below
                 if (IsTemplatePresentHere(group , new Vector3Int(here.x , here.y-3 , here.z), "Wall")) 
@@ -208,15 +178,121 @@ namespace Beyond
             return group.BeyondComponentsAt(here).Exists(bc => bc.template.name == t_name && bc.side == cs) ;
         }
 
+        public static bool CheckConstraints(BeyondComponent bc)
+        {
+            Constraints constraints = bc.template.constraints ;
+            switch(constraints.operation)
+            {
+                case "OR":
+                    return OrConstraints(bc , constraints.constraintsList) ;
+                case "AND":
+                    return AndConstraints(bc , constraints.constraintsList) ;
+                case "TOPCLEAR":
+                    return TopClear(bc);
+                case "BASEIN":
+                    return BaseInTerrain(bc);
+                case "ALLCLEAR":
+                    return AllClear(bc);
+                case "NEEDSONE":
+                    return NeedsOne(bc , constraints.templatesList, constraints.offsetsList, constraints.cellSides);
+                case "NEEDSALL":
+                    return NeedsAll(bc , constraints.templatesList, constraints.offsetsList, constraints.cellSides);
+                default:
+                    return false;
+            }
+        }
+
         //TODO
+        private static bool OrConstraints(BeyondComponent bc , List<Constraints> lc)
+        {
+            foreach (Constraints c in lc)
+            {
+                if (CheckConstraints(bc)) return true;
+            }
+            return false ;
+        }
+
+        private static bool AndConstraints(BeyondComponent bc , List<Constraints> lc)
+        {
+            foreach (Constraints c in lc)
+            {
+                if (!CheckConstraints(bc)) return false;
+            }
+            return true ;
+        }
+
         private static bool TopClear(BeyondComponent bc)
         {
             throw new NotImplementedException();
         }
-        private static bool BaseInput(BeyondComponent bc , float depth)
+
+        // Is the bottom inside terrain by enough ?I also need to take the current heightOffset into accunt
+        private static bool BaseInTerrain(BeyondComponent bc)
         {
-            throw new NotImplementedException();
+            Vector3 BoxCast = bc.template.castBox ;
+            Vector3 p = bc.transform.gameObject.transform.position ;
+            Quaternion q = bc.transform.gameObject.transform.rotation ;
+            
+            // TODO : get this from the UI Controller, set it in the ElementPlacementController
+            float YOffset = 0.1f;
+
+            // Cast 4 boxes at each corner of the bottom of the object
+            // Their centres are: p + BoxCast in both X and Z, plus FoundationInTerrainBy / 2
+            for (float i = -1; i <= 2; i+=2)
+            {
+                for (float j = -1; j <= 2; j+=2)
+                {
+                    Vector3 point = (p + new Vector3((BoxCast.x - FoundationInTerrainBy/2) * i , - BoxCast.y + FoundationInTerrainBy/2 + YOffset , (BoxCast.z - FoundationInTerrainBy/2) * j ))  ;
+                    point = ElementPlacementController.RotateAroundPoint(point , p , q) ;
+                    /*
+                    The line above should be equivalent to the 3 lines below
+                    Vector3 direction = point - p ; // In order to apply the rotation, we need to find a vector from p to this new point
+                    direction = q * direction ; // we can then rotate that direction
+                    point = direction + p; // and apply it back, now fully rotated, to the original point p
+                    */
+
+                    //Debug.DrawLine(point + (Vector3.down * YOffset), new Vector3(point.x , point.y- FoundationInTerrainBy/2 , point.z) , Color.yellow , 0.25f);
+
+                    // The height of the boxes' starting point must be offset by their height (BoxCast.y) and YOffset
+                    if (Physics.BoxCast(point - (Vector3.down * (BoxCast.y - YOffset)), BoxCast, Vector3.down, q, Mathf.Infinity , getTerrainMask()))
+                    {
+                        return false ;
+                    }
+                }
+            }
+            return true ;
         }
+
+        /*
+        BaseInTerrain should replace this
+        public static bool BaseIsInTerrain(Vector3 p , Vector3 BoxCast , Quaternion q , float YOffset)
+        {
+            // Cast 4 boxes at each corner of the bottom of the object
+            // Their centres are: p + BoxCast in both X and Z, plus FoundationInTerrainBy / 2
+            for (float i = -1; i <= 2; i+=2)
+            {
+                for (float j = -1; j <= 2; j+=2)
+                {
+                    Vector3 point = (p + new Vector3((BoxCast.x - FoundationInTerrainBy/2) * i , - BoxCast.y + FoundationInTerrainBy/2 + YOffset , (BoxCast.z - FoundationInTerrainBy/2) * j ))  ;
+                    point = ElementPlacementController.RotateAroundPoint(point , p , q) ;
+                    //The line above should be equivalent to the 3 lines below
+                    //Vector3 direction = point - p ; // In order to apply the rotation, we need to find a vector from p to this new point
+                    //direction = q * direction ; // we can then rotate that direction
+                    //point = direction + p; // and apply it back, now fully rotated, to the original point p
+
+                    Debug.DrawLine(point + (Vector3.down * YOffset), new Vector3(point.x , point.y- FoundationInTerrainBy/2 , point.z) , Color.yellow , 0.25f);
+
+                    // The height of the boxes' starting point must be offset by their height (BoxCast.y) and YOffset
+                    RaycastHit hitInfo;
+                    if (Physics.BoxCast(point - (Vector3.down * (BoxCast.y - YOffset)), BoxCast, Vector3.down, out hitInfo, q, Mathf.Infinity , getTerrainMask()))
+                    {
+                        return false ;
+                    }
+                }
+            }
+            return true ;
+        }
+        */
 
         private static bool AllClear(BeyondComponent bc)
         {
