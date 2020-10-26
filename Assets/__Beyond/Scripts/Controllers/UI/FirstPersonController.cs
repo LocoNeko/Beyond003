@@ -1,11 +1,14 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using TMPro;
 
 namespace Beyond
 {
     public class FirstPersonController : MonoBehaviour
     {
+        public static FirstPersonController Instance { get; protected set; }
+
         public CharacterController cc;
         public float speed = 12f;
         public float gravity = -9.8f;
@@ -15,11 +18,18 @@ namespace Beyond
 
         public Transform groundCheck;
         float groundDistance = 0.4f;
-        public LayerMask groundMask;
-        public LayerMask buildingMask;
 
         public Vector3 velocity;
         public bool isOnGround;
+
+        void OnEnable()
+        {
+            if (Instance != null)
+            {
+                Debug.LogError("There should never be multiple FirstPerson controllers");
+            }
+            Instance = this;
+        }
 
         // Update is called once per frame
         void Update()
@@ -31,7 +41,7 @@ namespace Beyond
                 {
                     // TO DO : Should I check for different masks to prevent jumping from non-jumpable objects ?
                     // Does such a thing even exists ? 
-                    isOnGround = Physics.CheckSphere(groundCheck.position, groundDistance, groundMask) || Physics.CheckSphere(groundCheck.position, groundDistance, buildingMask);
+                    isOnGround = Physics.CheckSphere(groundCheck.position, groundDistance, ConstraintController.getTerrainMask()) || Physics.CheckSphere(groundCheck.position, groundDistance, ConstraintController.getBuildingsMask());
                     timer = 0f;
                     if (isOnGround && velocity.y < 0)
                     {
@@ -44,7 +54,7 @@ namespace Beyond
                 running = Input.GetKey(KeyCode.LeftShift);
 
                 Vector3 move = transform.right * x + transform.forward * z;
-                cc.Move(move * speed * (running ? 3 : 1) * Time.deltaTime);
+                cc.Move(move * speed * (running ? 2.5f : 1) * Time.deltaTime);
 
                 if (Input.GetButtonDown("Jump") && isOnGround)
                 {

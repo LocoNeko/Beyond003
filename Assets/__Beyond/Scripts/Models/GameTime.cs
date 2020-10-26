@@ -140,7 +140,7 @@ namespace Beyond
             }
             else
             {
-                Debug.Log(String.Format("Invalid speed {0}.", i));
+                Debug.LogError(String.Format("Invalid speed {0}.", i));
             }
             return false;
         }

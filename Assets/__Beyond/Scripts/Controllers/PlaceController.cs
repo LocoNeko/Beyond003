@@ -1,11 +1,12 @@
 ﻿using System;
 using UnityEngine;
+using TMPro;
 
 namespace Beyond
 {
     public class PlaceController : MonoBehaviour
     {
-        Place place;
+        public Place place {get; protected set;}
         // This is how many World unit there are in one "cell"
         public static readonly float cellSize = 1f;
         public static PlaceController Instance;
@@ -24,39 +25,25 @@ namespace Beyond
             place = new Place();
         }
 
-
-        public void CreateNewBeyondGroup(BeyondComponent bc=null , string name=null)
+        public void CreateNewBeyondGroup(BeyondComponent bc , string name=null)
         {
             if (name == null)
             { // Auto give name
                 name = String.Format("Group {0:0000}",place.beyondGroups.Count);
             }
-            BeyondGroup group = new BeyondGroup(name);
+            // bc.transform.position - bc.template.pivotOffset : THIS IS ESSENTIAL
+            // This allows us to properly set the pivot of the group 
+            BeyondGroup group = new BeyondGroup(name , bc.transform.position - bc.template.pivotOffset , bc.transform.rotation);
             if (bc!=null)
             {
                 group.addBeyondComponent(bc);
-                bc.setObjectGroup(group);
+                // Vector3Int.zero because the first object in a group is at position [0,0,0]
+                // TODO: cellSide.Down because the first object is always a foundation, but I shouldn't hardcode
+                bc.setObjectGroup(group , Vector3Int.zero , cellSide.Down , true);
             }
             place.beyondGroups.Add(group);
         }
 
-        /// <summary>
-        /// For a given object and a direction, find where the centre of the neighbouring cell would be
-        /// </summary>
-        /// <param name="go"></param>
-        /// <param name="direction"></param>
-        /// <returns></returns>
-        public Vector3 neighbourCentre(GameObject go, Vector3Int direction)
-        {
-            GameObject g = new GameObject();
-            g.transform.position = go.transform.position + cellSize * (Vector3)direction;
-            g.transform.RotateAround(go.transform.position, go.transform.right, go.transform.rotation.eulerAngles.x);
-            g.transform.RotateAround(go.transform.position, go.transform.up, go.transform.rotation.eulerAngles.y);
-            g.transform.RotateAround(go.transform.position, go.transform.forward, go.transform.rotation.eulerAngles.z);
-            Vector3 result = g.transform.position;
-            Destroy(g);
-            return result;
-        }
 
     }
 }

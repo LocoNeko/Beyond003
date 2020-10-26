@@ -8,25 +8,24 @@ namespace Beyond
     public class Template
     {
         public string name { get; protected set; }
-        public List<Feature> features { get; protected set; }
+        // The cast box allows us to prevent the object from being inside terrain and is a good alternative to colliders
         public Vector3 castBox { get; protected set; }
+        //The pivotOffset tells us where the cell's centre is compared to the object's centre
         public Vector3 pivotOffset { get; protected set; }
-
         public GameObject prefab { get; protected set; }
 
-        public Template(string n, List<Feature> lf, Vector3 cb , GameObject prefab_go , Vector3? po=null)
+        public Template(string name, Vector3 castBox , GameObject prefab_go , Vector3? pivotOffset=null)
         {
-            name = n;
-            features = lf;
-            castBox = cb;
-            prefab = prefab_go;
-            if (po!=null)
+            this.name = name;
+            this.castBox = castBox;
+            this.prefab = prefab_go;
+            if (pivotOffset!=null)
             {
-                pivotOffset = (Vector3)po;
+                this.pivotOffset = (Vector3)pivotOffset;
             }
             else
             {
-                pivotOffset = Vector3.zero;
+                this.pivotOffset = Vector3.zero;
             }
         }
     }

@@ -8,51 +8,120 @@ namespace Beyond
 {
     public enum BC_State : int { Ghost, Blueprint, Solid}
 
+    public enum cellSide : int {Up , Down , Right , Left , Front , Back}
+
     // This script is attached to all objects specific to Beyond that can be created & placed
     public class BeyondComponent : MonoBehaviour
     {
-        //TODO : maybe this can be in TemplateController instead (more robust)
-        public static List<string> featureTags = new List<string>(){"InTerrain" , "SnapH" , "SnapV"};
-        public Template template;
+        public Template template { get; protected set; }
         //TODO : Use this to determine what the parent object should collide with, snap with, etc
         public BC_State state { get; protected set; }
-        public List<Feature> features { get; protected set; }
-        public Vector3 castBox { get; protected set; }
-        public Vector3 pivotOffset { get; protected set; }
-        public HashSet<GameObject> objectsTriggered { get; protected set; } // Objects this BO is colliding with
-        public BeyondGroup beyondGroup;
+        public BeyondGroup beyondGroup { get; protected set; }
+        
+        // Where is this component inside this cell ?
+        public cellSide side { get; protected set; }
 
-        /// <summary>
-        /// Whether or not an object tag means the object is based on a feature
-        /// </summary>
-        /// <param name="t"></param>
-        /// <returns></returns>
-        private static bool tagIsFeatureTag(string t)
-        {
-            return featureTags.Contains(t);
-        }
+        // Where is this component's object in its group, compared to the group's root position
+        public Vector3Int groupPosition { get; protected set; }
+
+        public List<Vector3Int> cells { get; protected set; }
+        public HashSet<GameObject> objectsTriggered { get; protected set; } // Objects this BO is colliding with
 
         public BeyondComponent()
         {
             state = BC_State.Ghost;
             beyondGroup = null;
-            features = new List<Feature>();
+            cells = new List<Vector3Int>();
             objectsTriggered = new HashSet<GameObject>();
         }
 
-        public void initialise(Template t)
+        public void setTemplate(Template t)
         {
             template = t;
-            castBox = t.castBox;
-            features = t.features;
-            pivotOffset = t.pivotOffset;
         }
 
-        public void setObjectGroup (BeyondGroup g)
+        public void SetState(BC_State newState)
+        {
+            state = newState ;
+        }
+
+        public void setObjectGroup (BeyondGroup g , Vector3Int p , cellSide cs , bool firstObject=false)
         { // TODO should make that more robust : what if g is null ?
             unsetObjectGroup();
-            beyondGroup = g;
-            g.addBeyondComponent(this);
+            if (g!=null)
+            {
+                beyondGroup = g ;
+                groupPosition = p ;
+                side = cs ;
+                // The first object should not be offset or rotated by the group, since it sets the group position and rotation 
+                if (!firstObject)
+                {
+                    // Rotate the pivot offset by the group's rotation
+                    Vector3 rotatedPivotOffset = template.pivotOffset ;
+                    rotatedPivotOffset = g.rotation * rotatedPivotOffset ;
+                    // Then  by the sideRotation
+                    rotatedPivotOffset = sideRotation(cs) * rotatedPivotOffset ;
+
+                    // Move the object to its template offset position
+                    transform.position += rotatedPivotOffset;
+
+                    // Rotate the object by the group's rotation + its cellSide rotation
+                    transform.rotation = g.rotation * sideRotation(cs) ;
+                }
+                g.addBeyondComponent(this);
+            }
+        }
+
+        //TODO : don't think this is used any more
+        private static Quaternion sideRotation(cellSide cs)
+        {
+            switch(cs)
+            {
+                case cellSide.Right:
+                    return Quaternion.Euler(0,90f,0);
+                case cellSide.Front:
+                    return Quaternion.Euler(0,180f,0);
+                case cellSide.Left:
+                    return Quaternion.Euler(0,270f,0);
+            }
+            return Quaternion.identity ;
+        }
+
+        public static cellSide closestSide(Vector3 distanceFromPivot)
+        {
+            float d = Vector3.Distance(distanceFromPivot , new Vector3(0,0,-0.5f));
+            cellSide result = cellSide.Front ;
+            float d2 = Vector3.Distance(distanceFromPivot , new Vector3(0,0,0.5f));
+            if (d2 < d)
+            {
+                d = d2;
+                result = cellSide.Back ;
+            }
+            d2 = Vector3.Distance(distanceFromPivot , new Vector3(-0.5f,0,0));
+            if (d2 < d)
+            {
+                d = d2;
+                result = cellSide.Left ;
+            }
+            d2 = Vector3.Distance(distanceFromPivot , new Vector3(0.5f,0,0));
+            if (d2 < d)
+            {
+                d = d2;
+                result = cellSide.Right ;
+            }
+            d2 = Vector3.Distance(distanceFromPivot , new Vector3(0,0.5f,0));
+            if (d2 < d)
+            {
+                d = d2;
+                result = cellSide.Up ;
+            }
+            d2 = Vector3.Distance(distanceFromPivot , new Vector3(0,-0.5f,0));
+            if (d2 < d)
+            {
+                d = d2;
+                result = cellSide.Down;
+            }
+            return result ;
         }
 
         public void unsetObjectGroup()
@@ -64,101 +133,42 @@ namespace Beyond
             beyondGroup = null;
         }
 
-        // TODO : clean this so the creation of a BeyondComponent generates all needed features & castbox from its template
-        public void createAllFeatures()
+        public bool insideTerrain()
         {
-            castBox = template.castBox;
-            foreach (Feature ft in template.features)
-            { // Create the features based on the template's features. Can't do features = template.features as it make Unity create distinct instances of GameObjects below (took me 3 hours to figure this bug out)
-                Feature f = new Feature(ft.offset, ft.tag, ft.snapToTags);
-                foreach (Vector3Int v in ft.canLinkTo)
-                {
-                    f.addLink(v);
-                }
-                features.Add(f);
-            }
-            int i = 0;
-            foreach (Feature f in features)
+            Collider[] collidersHit = Physics.OverlapBox(transform.position , template.castBox , transform.rotation , ConstraintController.getTerrainMask()) ;
+            /*
+            string debug_string="insideTerrain overlap boxes=";
+            foreach (Collider c in collidersHit)
             {
-                CreateGameObjectForFeature(f , i);
-                i++;
+                debug_string += c.gameObject.name + ",";
             }
+            Debug.Log(debug_string);
+            */
+            return (collidersHit.Length >0);
         }
-
-        private void CreateGameObjectForFeature(Feature f , int i)
-        {
-            if (tagRequiresObject(f.tag))
-            {
-                //TO DO : all this coding depends on the feature's tag
-                // If the tag requires a gameObject for this feature, create it here
-                GameObject go = new GameObject();
-                go.transform.parent = transform;
-                go.transform.localPosition = f.offset;
-                go.name = transform.gameObject.name + "_Feature_" + i;
-                go.tag = f.tag;
-                f.setGameObject(go);
-                // Add a SphereCollider to the feature for snapping
-                // If the tag requires a collider added to the gameObject's feature, create it here
-                generateObjectCollider(f.tag, go);
-            }
-        }
-
-
-        private bool tagRequiresObject(string tag)
-        {
-            // TODO move hardcoding to some kind of tag controller
-            return tag == "InTerrain";
-        }
-        private void generateObjectCollider(string tag, GameObject go)
-        {
-            // TODO move hardcoding to some kind of tag controller
-            if (tag=="InTerrain")
-            {
-                SphereCollider sc = go.AddComponent<SphereCollider>();
-                sc.isTrigger = true;
-                sc.radius = 0.25f;
-            }
-        }
-
 
         public bool collidingWithBuilding(bool checkSameGroup = true)
         {
             foreach (GameObject g in objectsTriggered)
             {
-                if (g.layer == LayerMask.NameToLayer("Buildings"))
+                //TODO : debug this. I need to make sure "triggers" are fine
+                //Debug.Log("objectsTriggered= "+g.name);
+                if (ConstraintController.layerIsInMask(g.layer, ConstraintController.getBuildingsMask()))
                 {
-                    if (checkSameGroup || g.GetComponent<BeyondComponent>().beyondGroup != beyondGroup)
+                    if (!checkSameGroup || g.GetComponent<BeyondComponent>().beyondGroup != beyondGroup)
                     {
+                        //Debug.Log("collidingWithBuilding TRUE. Object is in group " + g.GetComponent<BeyondComponent>().beyondGroup.name + " from group " + (beyondGroup!=null ? beyondGroup.name : "NULL"));
                         return true;
                     }
                 }
             }
+            //Debug.Log("collidingWithBuilding FALSE");
             return false;
-        }
-
-        public string objectsCollidingString()
-        {
-            return String.Join(",", objectsTriggered);
-        }
-
-        /// <summary>
-        /// Returns all GameObject that are based on a feature (based on their tag, like "InTerrain" or "SnapH")
-        /// </summary>
-        /// <returns></returns>
-        public IEnumerable<GameObject> collidingWithFeatureGameObjects()
-        {
-            return objectsTriggered.Where<GameObject>(g => tagIsFeatureTag(g.tag));
-        }
-
-        public List<Vector3Int> neighbourLinks(Feature f1, Feature f2)
-        {
-            List<Vector3Int> list1 = f1.canLinkTo;
-            List<Vector3Int> list2 = f2.canLinkTo;
-            return list1.Intersect<Vector3Int>(list2).ToList();
         }
 
         void OnTriggerEnter(Collider c)
         {
+            Debug.Log("OnTriggerEnter: "+c.gameObject.name);
             objectsTriggered.Add(c.gameObject);
         }
 
@@ -167,5 +177,7 @@ namespace Beyond
             objectsTriggered.Remove(c.gameObject);
         }
 
+
     }
+
 }

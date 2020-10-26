@@ -7,26 +7,27 @@ namespace Beyond
     public enum Hemisphere : int { North, South }
     public class Place
     {
-        public string Name { get; protected set; }
+        public string name { get; protected set; }
         public Hemisphere hemisphere { get; protected set; }
         public Gametime gametime { get; protected set; }
         public int Length { get; protected set; }
         public int Width { get; protected set; }
         public int Height { get; protected set; }
-        public int MinLevel { get; protected set; }
+        public int LowestY { get; protected set; }
         public List<BeyondGroup> beyondGroups { get; protected set; }
 
-        public Place(string s = "A test place", int l = 1000, int w = 1000, int h = 200, int ml = -20)
+
+        public Place(string s = "A test place", int l = 1000, int w = 1000, int h = 200, int ly = -20)
         {
-            Name = s;
+            name = s;
             hemisphere = Hemisphere.North;
             gametime = new Gametime();
             Length = l;
             Width = w;
             Height = h;
-            MinLevel = ml;
+            LowestY = ly;
             beyondGroups = new List<BeyondGroup>();
-            Debug.Log("New place created");
+            Debug.Log(string.Format("New place '{0}' created" , name));
         }
 
         public void update(float deltatime)

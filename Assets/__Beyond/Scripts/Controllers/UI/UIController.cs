@@ -1,6 +1,6 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System;
 using UnityEngine;
+using TMPro;
 
 namespace Beyond
 {
@@ -9,6 +9,17 @@ namespace Beyond
     {
         public static UIController Instance { get; protected set; }
         public gameMode gameMode { get; protected set; }
+        TextMeshProUGUI TM_Infos ;
+        TextMeshProUGUI TM_CurrentPosition ;
+        public BeyondGroup closestGroup {get; protected set;}
+        public Vector3Int positionInGroup ;
+
+        void Awake()
+        {
+            TM_CurrentPosition = GameObject.Find("Label_CurrentPosition").GetComponent<TextMeshProUGUI>();
+            TM_Infos = GameObject.Find("Label_Infos").GetComponent<TextMeshProUGUI>() ;
+            positionInGroup = new Vector3Int(-999,-999,-999);
+        }
 
         void OnEnable()
         {
@@ -36,6 +47,16 @@ namespace Beyond
                     setGameMode(gameMode.free);
                 }
             }
+
+            Place place = PlaceController.Instance.place ;
+
+            // Shows the place name, hemisphere, and season, on 2 lines
+            TM_Infos.text = String.Format("{0} ({1})\n{2}" , place.name , place.hemisphere , place.GetSeason()); 
+
+            // Show First person position
+            //TODO : no need if we are using third person camera
+            Vector3 FPposition = FirstPersonController.Instance.transform.position ;
+            TM_CurrentPosition.text = string.Format("X={0:0.00};Y={1:0.00};Z={2:0.00}\nClosest group: {3}, {4}" , FPposition.x ,FPposition.y , FPposition.z , (closestGroup==null ? "N/A" : closestGroup.name) , positionInGroup);
         }
 
         public void setGameMode(gameMode gm)
@@ -52,6 +73,12 @@ namespace Beyond
             }
 
         }
+
+        public void SetClosestGroup(BeyondGroup g)
+        {
+            closestGroup = g ;
+        }
+
     }
 }
 

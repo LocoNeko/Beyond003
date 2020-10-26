@@ -1,38 +1,30 @@
-﻿using Beyond;
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 
 namespace Beyond
 {
-
     public class ElementPlacementController : MonoBehaviour
     {
         public Terrain terrain;
-        int nbObjectsPlaced = 0;
-        public LayerMask groundMask;
-        public LayerMask buildingMask;
+        public GameObject Fundation_prefab;
+
+        public LayerMask TerrainLayerMask;
 
         [SerializeField]
-        private KeyCode newObjectHotKey = KeyCode.U;
-        private KeyCode lowerTerrainHotKey = KeyCode.T;
-
-        /* TODO : There are 3 states for any objects :
-         * - floating around currentPlaceableObject
-         * - TODO: placed as a blueprint (under construction)
-         * - Placed for good
-         */
+        private KeyCode newFundationHotKey = KeyCode.U;
+        private KeyCode newWallHotKey = KeyCode.I;
+        private KeyCode newLevelHotKey = KeyCode.O;
+        private KeyCode newWallholeHotKey = KeyCode.P;
         private GameObject currentPlaceableObject;
         private BeyondComponent currentPlaceableBeyondComponent;
         private float mouseWheelRotation;
-        float heightOffset = -0.1f;
-        Vector3 mousePosition;
-        public bool snapped;
+        float heightOffset = 0f;
 
-        public GameObject testObjectPrefab;
-        List<GameObject> testObjects = new List<GameObject>();
+        public float groupSnapTolerance = 0.2f;
+        Vector3 mousePosition;
+        int nbObjectsPlaced=0;
 
         void Update()
         {
@@ -43,245 +35,242 @@ namespace Beyond
                 if (currentPlaceableObject != null)
                 {
                     bool wasRotated = RotateFromMouseWheel();
-                    bool heightWasAdjusted = mouseHeightOverride();
+                    bool heightWasAdjusted = MouseHeightOverride();
                     if (Input.mousePosition!=mousePosition || wasRotated || heightWasAdjusted)
                     { // only move placeable object when mouse has moved
                         mousePosition = Input.mousePosition;
-                        MoveCurrentPlaceableObjectToMouse();
+                        MovePlaceableObjectToMouse();
                     }
                     // Make the placeable red or green based on whether it can be placed
+                    //TODO: this belong inside the BeyondCOmponent itself
                     Renderer r = currentPlaceableObject.GetComponent<Renderer>();
-                    r.material.color = (canPlace() ? Color.green : Color.red);
+                    r.material.color = (ConstraintController.CanPlace(currentPlaceableObject , heightOffset) ? Color.green : Color.red);
                     ReleaseIfClicked();
                 }
             }
             else if (currentPlaceableObject != null)
             { // Always destroy placeable object when we leave build mode
-                //Debug.Log("Destroyed currentPlaceableObject " + currentPlaceableObject.GetInstanceID() + " when leaving build mode");
                 Destroy(currentPlaceableObject);
+                currentPlaceableBeyondComponent = null;
             }
         }
-
-        private void MoveCurrentPlaceableObjectToMouse()
+        private void MovePlaceableObjectToMouse()
         {
             Ray ray = Camera.main.ScreenPointToRay(mousePosition);
+            // TODO FIRST : I think this is were my wall ghost position fails and returns a bad position within the group it snaps to
+            //TODO FIRST : Really not sure non-foundation should be positioned on terrain, what's the point ? They have to  snap !
+            // INSTEAD -> Move them freely in 3D (with mouse wheel giving depth) and snap accordingly
+            // CONCLUSION : this layer mask depends on the template being placed 
 
             RaycastHit hitInfo;
-            if (Physics.Raycast(ray, out hitInfo, 250f, groundMask))
+            if (Physics.Raycast(ray, out hitInfo, 250f, ConstraintController.getTerrainMask()))
             {
                 Vector3 pointHit = hitInfo.point;
-                float height = GetHeightForClearTop();
-                // Here, allow a Y offset to be applied, to get base down or up a bit
-                pointHit.y = height + heightOffset;
-                currentPlaceableObject.transform.position = pointHit;
-                SnapToPlacedObjects();
-            }
-        }
-
-        public bool canPlace()
-        {
-            //TODO : not all placeableObjects need their base to be inside terrain, so I need to do better than this
-            // Probably, canPlace() is a templateController method
-            if (snapped)
-            {
-                // is the snapped object's top clear of terrain ?
-                // TO DO : this doesn't work if the base is just at the centre of a peak : the height itself will be fine, but the terrain will pierce through
-                // So I need a function that checks whether a thin box located slightly above the object collides with terrain
-                //TODO : on occasions, this can be off by just a tiny bit (I got 0.2500005f once and couldn't snap)
-                if (GetHeightForClearTop() - currentPlaceableBeyondComponent.transform.position.y <= 0.250001f)
+                Vector3 position = ConstraintController.GetValidPositionFromMouse(currentPlaceableObject , pointHit , ref heightOffset);
+                position.y += heightOffset;
+                //If I'm snapped, only move if I'm a bit far from my current position
+                // TODO : see hardcoded bit in MovePlaceableObject: Can I give better offsets for mouse positionning ?
+                if (currentPlaceableBeyondComponent.beyondGroup!=null)
                 {
-                    return !ObjectInsideAnother(false);
-                }
-            }
-            else
-            {
-                return BaseIsInsideTerrain() && !ObjectInsideAnother();
-            }
-            return false;
-        }
-
-
-        private float GetHeightForClearTop()
-        {
-            //TO DO : don't hardcode 10 here,I should do better than this
-            Vector3 point = currentPlaceableObject.transform.position + 10 * Vector3.up;
-            RaycastHit hitInfo;
-            Physics.BoxCast(point, currentPlaceableBeyondComponent.castBox, Vector3.down, out hitInfo, currentPlaceableObject.transform.rotation);
-            return hitInfo.point.y;
-        }
-
-        private bool BaseIsInsideTerrain()
-        {
-            if (currentPlaceableBeyondComponent!=null)
-            {
-                foreach (Feature f in currentPlaceableBeyondComponent.features)
-                { // Check all features tagged as "InTerrain"
-                    if (f.tag == "InTerrain")
+                    if (Vector3.Distance(position , currentPlaceableObject.transform.position) >0.2f)
                     {
-                        RaycastHit hitInfo;
-                        if (Physics.Raycast(f.gameObject.transform.position, Vector3.down, out hitInfo, 50f, groundMask))
-                        { // If I hit the terrain while casting a ray down, this can only mean I'm not inside it
-                            //Debug.Log("Base is not inside terrain");
-                            return false;
-                        }
-                    }
-                }
-            }
-            return true;
-        }
-        private bool ObjectInsideAnother(bool checkSameGroup=true)
-        {
-            if (currentPlaceableBeyondComponent!=null)
-            {
-                if (currentPlaceableBeyondComponent.objectsTriggered.Count>0)
-                {
-                    //Debug.Log("Colliding with placed object " + currentPlaceableBeyondComponent.objectsCollidingString());
-                }
-                //Debug.Log("ObjectInsideAnother is "+ currentPlaceableBeyondComponent.collidingWithBuilding(checkSameGroup) +" collided with "+ currentPlaceableBeyondComponent.objectsCollidingString());
-                return currentPlaceableBeyondComponent.collidingWithBuilding(checkSameGroup);
-            }
-            return false;
-        }
-
-        private void SnapToPlacedObjects()
-        {
-            /* 
-            * 1 - Get all featuresGameObjectsColliding GameObjects
-            * 2 - Get all their parent placedObjects
-            * 3 - Go through all the Features of the placedObjects, ignoring those that we didn't collide with
-            * = By PlacedObjects, we now have a list of Features, and we know they were collided with
-            * 4 - Go through those features to get all canLinkTo that we find in 2+ features
-            * 5 - get the corresponding neighbouring cell centres by using neighbourCentre(GameObject go , Vector3Int direction)
-            */
-            if (currentPlaceableBeyondComponent != null)
-            {
-                // 1 - Get all featuresGameObjectsColliding GameObjects
-                IEnumerable<GameObject> featuresGameObjectsColliding = currentPlaceableBeyondComponent.collidingWithFeatureGameObjects();
-
-                // 2 - Get all their parent placedObjects
-                HashSet<GameObject> collidedPlacedObjects = new HashSet<GameObject>();
-                HashSet<Vector3> uniqueNeighbourCentres = new HashSet<Vector3>();
-                Dictionary<Vector3,GameObject> placedObjectAtCentre = new Dictionary<Vector3, GameObject>();
-
-                // Put the parent GameObject of the collided feature's GameObject in collidedPlacedObjects
-                foreach (GameObject featureCollided in featuresGameObjectsColliding)
-                {
-                    collidedPlacedObjects.Add(featureCollided.transform.parent.gameObject);
-                }
-
-                // 3 - Go through all the Features of the placedObjects, ignoring those that we didn't collide with
-                foreach (GameObject collidedPlacedObject in collidedPlacedObjects)
-                {
-                    BeyondComponent bc = collidedPlacedObject.GetComponent<BeyondComponent>();
-                    HashSet<Feature> featuresOfCollidedObject = new HashSet<Feature>();
-                    // Get a list of Features for this collidedPlacedObject
-                    foreach (Feature f in bc.features)
-                    {
-                        if (featuresGameObjectsColliding.Contains<GameObject>(f.gameObject))
-                        { // only keep features we collided with
-                            featuresOfCollidedObject.Add(f);
-                        }
-                    }
-
-                    HashSet<Vector3Int> uniqueNeighbour = getUniqueNeighbours(featuresGameObjectsColliding, collidedPlacedObject);
-
-                    // 5 - get the corresponding neighbouring cell centres by using neighbourCentre(GameObject go, Vector3Int direction)
-                    foreach (Vector3Int v2 in uniqueNeighbour)
-                    {
-                        Vector3 point = PlaceController.Instance.neighbourCentre(collidedPlacedObject, v2);
-                        uniqueNeighbourCentres.Add(point) ;
-                        if (!placedObjectAtCentre.ContainsKey(point))
-                        {
-                            placedObjectAtCentre.Add(point, collidedPlacedObject);
-                        }
-                    }
-                }
-
-                // 6 - Check the closest centre to the currentPlaceableObject
-                if (collidedPlacedObjects.Count>0)
-                {
-                    float d = -1;
-                    Vector3 currentPosition = currentPlaceableObject.transform.position;
-                    Quaternion currentRotation = currentPlaceableObject.transform.rotation;
-                    foreach (Vector3 candidateCentre in uniqueNeighbourCentres)
-                    {
-                        float d2 = Vector3.Distance(candidateCentre , currentPosition);
-                        if (d == -1 || d2 < d)
-                        {
-                            d = d2;
-                            currentPosition = candidateCentre;
-                            currentRotation = placedObjectAtCentre[candidateCentre].transform.rotation;
-                            //TODO : should I really set the group here  ?
-                            BeyondGroup group = placedObjectAtCentre[candidateCentre].GetComponent<BeyondComponent>().beyondGroup;
-                            if (group!=null)
-                            {
-                                currentPlaceableBeyondComponent.setObjectGroup(group);
-                            }
-                            snapped = true;
-                        }
-                    }
-                    // We have snapped, we can move and rotate accordingly.
-                    // TODO : set the gorup here instead ?
-                    if (snapped)
-                    {
-                        currentPlaceableObject.transform.position = currentPosition;
-                        currentPlaceableObject.transform.rotation = currentRotation;
+                        MovePlaceableObject(position);
                     }
                 }
                 else
                 {
-                    snapped = false;
-                    currentPlaceableBeyondComponent.unsetObjectGroup();
+                    MovePlaceableObject(position);
                 }
+                // Unset the group before trying to snap or weird things happen
+                currentPlaceableBeyondComponent.unsetObjectGroup();
+                Snap();
             }
         }
 
-        //TODO : This method is much more complex than that, as some Object might give links based on only one feature (e.g. I can snap a wall to another based on just 1)
-        public HashSet<Vector3Int> getUniqueNeighbours(IEnumerable<GameObject> featuresGameObjectsColliding , GameObject collidedPlacedObject)
+        private void MovePlaceableObject(Vector3 p , Quaternion? r = null)
         {
-            HashSet<Vector3Int> result = new HashSet<Vector3Int>();
-            BeyondComponent bc = collidedPlacedObject.GetComponent<BeyondComponent>();
-            HashSet<Feature> features = new HashSet<Feature>();
-
-            // Get a list of Features for this collidedPlacedObject
-            foreach (Feature f in bc.features)
+            currentPlaceableObject.transform.position = p ;
+            if (currentPlaceableBeyondComponent.template.name != "Foundation")
+            { // TODO : very hardcoded. Can I give better offsets for mouse positionning ? put it back in MovePlaceableObjectToMouse ?
+                currentPlaceableObject.transform.position += currentPlaceableBeyondComponent.template.pivotOffset;
+            } 
+            if (r != null)
             {
-                if (featuresGameObjectsColliding.Contains<GameObject>(f.gameObject))
-                { // only keep features we collided with
-                    features.Add(f);
+                currentPlaceableObject.transform.rotation = (Quaternion)r;
+            }
+        }
+
+        private void Snap()
+        {
+            // 1 - what groups are close to currentPlaceableObject ?
+            BeyondGroup closestGroup ;
+            findCloseGroups(currentPlaceableBeyondComponent , out closestGroup);
+            if (closestGroup!=null) 
+            {
+                //Debug.Log("closestGroup"+closestGroup.name);
+
+                // Find the centre where I should place the object based on the group's "root" position and the Vector3Int difference between there and here
+                // 1 - where would the cell centre be, considering the offset of this placeable object's template
+                // TODO : this is already wrong :  walls rotate, and base on that the cell's centre is not that
+                Vector3 pointWithOffset = currentPlaceableBeyondComponent.transform.position - currentPlaceableBeyondComponent.template.pivotOffset;
+                
+                // 2 - calculate the difference between this point and the group's centre and apply the inverse rotation for the group
+                pointWithOffset = RotateAroundPoint(pointWithOffset , closestGroup.position , Quaternion.Inverse(closestGroup.rotation));
+                /*
+                The statement above should be equivalent to the 3 lines below
+                Vector3 diff = pointWithOffset - closestGroup.position ;
+                diff = Quaternion.Inverse(closestGroup.rotation) * diff ;
+                pointWithOffset = diff + closestGroup.position ;
+                */
+
+                // 3 - Obtain the equivalent Integer Vector3, which represents how many cells the object is from the group's centre
+                Vector3Int diffInt2 = Vector3Int.RoundToInt(pointWithOffset - closestGroup.position);
+                UIController.Instance.positionInGroup = diffInt2;
+
+                // 4 - This is the position of the centre of the cell
+                Vector3 snappedPosition = closestGroup.position + (Vector3)diffInt2; //FIXME + currentPlaceableBeyondComponent.template.pivotOffset;
+                Vector3 snappedPositionDebug = snappedPosition ;
+
+                // 5 - Rotate it by the group's rotation for final result
+                snappedPosition = RotateAroundPoint(snappedPosition , closestGroup.position , closestGroup.rotation) ;
+                /*
+                The statement above should be equivalent to the 3 lines below
+                Vector3 direction = snappedPosition - closestGroup.position ;
+                direction = closestGroup.rotation * direction ;
+                snappedPosition = direction + closestGroup.position ;
+                */
+
+                //Debug.Log("snap to object in position "+diffInt2+" group rotation changed the position by: "+(snappedPositionDebug-snappedPosition));
+                // TODO : move all constraints to ConstraintController
+
+                // Test to see if foundation is above groud like in GetValidPositionFromMouse
+                Vector3 point = ConstraintController.GetPointOnTerrain(currentPlaceableObject , currentPlaceableObject.transform.position) ;
+                float minY = point.y ;
+
+                if (snappedPosition.y>=minY)
+                { // Snap in place only if object's top is above ground
+                    cellSide snapToSide;
+
+                    // TODO: Not needed aymore: angle between the rotation of the group and the rotation of the object on the Y axis
+                    // float angle = Mathf.Abs(currentPlaceableObject.transform.rotation.eulerAngles.y - closestGroup.rotation.eulerAngles.y );
+
+                    //TODO : unfortunately, this is wrong. the rotation of the placeable object is irrelevant: snap to the side from which the object is closest !
+                    // Then we can pass snapToSide directly
+                    // TODO : so we need a distance not an angle
+                    if (ConstraintController.CanSnapToGroupHere(closestGroup , diffInt2 , currentPlaceableBeyondComponent.template , snappedPosition - pointWithOffset , out snapToSide))
+                    {
+                        currentPlaceableObject.transform.position = snappedPosition ;
+                        currentPlaceableBeyondComponent.setObjectGroup(closestGroup ,diffInt2 , snapToSide);
+                    }
+                    /*
+                    else
+                    {
+                        Debug.Log("Can't snap here because of group constraints");
+                    }
+                    */
                 }
             }
-
-            // Go through those features to get all canLinkTo that we find in 2+ features
-            // TODO THis is wrong, as we've seen some templates are happy with just one features, some don't like vertical snapping, etc
-            foreach (Feature f2 in features)
+            else
             {
-                foreach (Vector3Int v in f2.canLinkTo)
+                currentPlaceableBeyondComponent.unsetObjectGroup();
+                UIController.Instance.positionInGroup = new Vector3Int(-999,-999,-999);
+            }
+        }
+
+        private List<BeyondGroup> findCloseGroups(BeyondComponent bc , out BeyondGroup closestGroup)
+        {
+            List<BeyondGroup> result= new List<BeyondGroup>();
+            // Find the groups that are close to this BeyondComponent
+            Collider[] collidersInGroup = Physics.OverlapBox(bc.transform.position , bc.template.castBox + new Vector3(1f,1f,1f) * groupSnapTolerance , bc.transform.rotation , ConstraintController.getBuildingsMask()) ;
+            closestGroup = null ;
+            float minDistance = 0;
+
+            foreach(Collider c in collidersInGroup)
+            {
+                BeyondComponent collided_bc = c.transform.GetComponent<BeyondComponent>() ;
+                if (collided_bc!=null && collided_bc.beyondGroup!=null)
                 {
-                    // Don't check up and down for fundations
-                    // TODO: so all this will depend on the template of what we are trying to snap: fundations don't snap vertically
-                    if (v.y==0)
+                    result.Add(collided_bc.beyondGroup) ;
+                    float distance = Vector3.Distance(bc.transform.position , collided_bc.transform.position) ;
+                    if (closestGroup==null || distance < minDistance)
                     {
-                        foreach (Feature f3 in features)
-                        {
-                            if ((f2 != f3) && (f3.canLinkTo.Contains(v)))
-                            {
-                                //TODO : this is great but insufficient. Another group COULD have an object here preventing placement !
-                                BeyondGroup bg = bc.beyondGroup;
-                                if (bg.hasBeyondComponentAtCoordinate(PlaceController.Instance.neighbourCentre(collidedPlacedObject, v)))
-                                {
-                                    Debug.Log("Group " + bg.name + " already has an object here");
-                                }
-                                else
-                                {
-                                    result.Add(v);
-                                }
-                            }
-                        }
+                        minDistance = distance ;
+                        closestGroup = collided_bc.beyondGroup ;
                     }
                 }
             }
-            return result;
+            UIController.Instance.SetClosestGroup(closestGroup);
+
+            return result ;
+        }
+
+        private void HandleNewObjectHotkey()
+        {
+            if (Input.GetKeyDown(newFundationHotKey))
+            {
+                CreateNewPlaceableObject("Foundation");
+            }
+            if (Input.GetKeyDown(newWallHotKey))
+            {
+                CreateNewPlaceableObject("Wall");
+            }
+            if (Input.GetKeyDown(newLevelHotKey))
+            {
+                CreateNewPlaceableObject("Level");
+            }
+            if (Input.GetKeyDown(newWallholeHotKey))
+            {
+                CreateNewPlaceableObject("Wallhole");
+            }
+        }
+
+        private void CreateNewPlaceableObject(string templateName)
+        {
+            if (currentPlaceableObject == null)
+            {
+                Template template = TemplateController.Instance.templates[templateName];
+                heightOffset=0;
+                //TODO : this will be inside the template controller.
+                currentPlaceableObject = Instantiate(template.prefab);
+                //TODO : need to experiment with BoxColldier & trigger
+                currentPlaceableObject.GetComponent<BoxCollider>().enabled = true;
+                currentPlaceableBeyondComponent = currentPlaceableObject.AddComponent<BeyondComponent>();
+                currentPlaceableBeyondComponent.setTemplate(template);
+            }
+            else
+            {
+                //Debug.Log("Destroyed currentPlaceableObject " + currentPlaceableObject.GetInstanceID() + " when i re-pressed the place key");
+                Destroy(currentPlaceableObject);
+            }
+        }
+        private void ReleaseIfClicked()
+        {
+            if (Input.GetMouseButtonDown(0))
+            {
+                if (ConstraintController.CanPlace(currentPlaceableObject , heightOffset))
+                {
+                    // Set the material back to the prefab's material to get rid of the green or red colours
+                    currentPlaceableObject.GetComponent<Renderer>().material = TemplateController.prefabMaterial(currentPlaceableBeyondComponent.template);
+                    // TODO : Really need to think hard about this: will the box collider as trigger really be a general case for all elements ?
+                    currentPlaceableObject.GetComponent<BoxCollider>().isTrigger = false;
+                    currentPlaceableObject.GetComponent<BoxCollider>().enabled = true;
+                    currentPlaceableBeyondComponent.SetState(BC_State.Blueprint) ;
+                    currentPlaceableObject.name = currentPlaceableBeyondComponent.template.name + "_" + (nbObjectsPlaced++);
+                    // if the object was not snapped to a group, create a new group
+                    if(currentPlaceableBeyondComponent.beyondGroup==null)
+                    {
+                        PlaceController.Instance.CreateNewBeyondGroup(currentPlaceableBeyondComponent);
+                    }
+                    currentPlaceableObject = null;
+                    //snapped = false;
+                    //TODO : If SHIFT is pressed, allow queuing of objects to be placed
+                }
+                else
+                {
+                    //Debug.Log("Destroyed currentPlaceableObject "+ currentPlaceableObject .GetInstanceID()+ " as I couldn't place it");
+                    Destroy(currentPlaceableObject);
+                }
+            }
         }
 
         private bool RotateFromMouseWheel()
@@ -289,13 +278,13 @@ namespace Beyond
             if ((mouseWheelRotation  != Input.mouseScrollDelta.y) && !Input.GetKey(KeyCode.LeftControl))
             {
                 mouseWheelRotation = Input.mouseScrollDelta.y;
-                currentPlaceableObject.transform.Rotate(Vector3.up, mouseWheelRotation * 2f);
+                currentPlaceableObject.transform.Rotate(Vector3.up, mouseWheelRotation * 5f);
                 return true;
             }
             return false;
         }
 
-        private bool mouseHeightOverride()
+        private bool MouseHeightOverride()
         {
             if (Input.GetKey(KeyCode.LeftControl))
             {
@@ -307,92 +296,16 @@ namespace Beyond
                 {
                     heightOffset -= 0.1f;
                 }
-                //TODO : clamp based on placebaleobject's height
-                heightOffset = Mathf.Clamp(heightOffset, -0.2f, 0f);
                 return true;
             }
             return false;
         }
 
-
-        private void ReleaseIfClicked()
+        //TODO : I should really place those into another class, specifically for that typoe of manipulation
+        public static Vector3 RotateAroundPoint(Vector3 p , Vector3 pivot , Quaternion r)
         {
-            if (Input.GetMouseButtonDown(0))
-            {
-                if (canPlace())
-                {
-                    // Set the material back to the prefab's material to get rid of the green or red colours
-                    currentPlaceableObject.GetComponent<Renderer>().material = TemplateController.prefabMaterial(currentPlaceableBeyondComponent.template);
-                    // TODO : Really need to think hard about this: will the box collider as trigger really be a general case for all elements ?
-                    currentPlaceableObject.GetComponent<BoxCollider>().isTrigger = false;
-                    currentPlaceableObject.GetComponent<BoxCollider>().enabled = true;
-                    currentPlaceableObject.name = "placedObject_" + (nbObjectsPlaced++);
-                    if(currentPlaceableBeyondComponent.beyondGroup==null)
-                    {
-                        PlaceController.Instance.CreateNewBeyondGroup(currentPlaceableBeyondComponent);
-                    }
-                    currentPlaceableObject = null;
-                    snapped = false;
-                    //TODO : If SHIFT is pressed, allow queuing of objects to be placed
-                }
-                else
-                {
-                    //Debug.Log("Destroyed currentPlaceableObject "+ currentPlaceableObject .GetInstanceID()+ " as I couldn't place it");
-                    Destroy(currentPlaceableObject);
-                }
-            }
+            return r * (p - pivot) + pivot ;
         }
 
-        private void HandleNewObjectHotkey()
-        {
-            if (Input.GetKeyDown(newObjectHotKey))
-            {
-                createNewPlaceableObject();
-            }
-            if (Input.GetKeyDown(lowerTerrainHotKey))
-            {
-                lowerTerrain();
-            }
-        }
-
-        private void createNewPlaceableObject()
-        {
-            if (currentPlaceableObject == null)
-            {
-                currentPlaceableObject = TemplateController.Instance.CreateGameObject("Fundation");
-                currentPlaceableBeyondComponent = currentPlaceableObject.GetComponent<BeyondComponent>();
-            }
-            else
-            {
-                //Debug.Log("Destroyed currentPlaceableObject " + currentPlaceableObject.GetInstanceID() + " when i re-pressed the place key");
-                Destroy(currentPlaceableObject);
-            }
-        }
-
-        private void lowerTerrain()
-        {
-            // TO DO : This needs a lot of work, and to understand terrain resolution to properly translate World -> terrain height map 
-
-            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-            RaycastHit hitInfo;
-            if (Physics.Raycast(ray, out hitInfo, 500f, groundMask))
-            {
-                int xRes = terrain.terrainData.heightmapResolution;
-                int yRes = terrain.terrainData.heightmapResolution;
-                Vector3 pointHit = hitInfo.point;
-                //testObject.transform.position = hitInfo.point;
-                int x = xRes - (int)hitInfo.point.x;
-                int y = yRes - (int)hitInfo.point.z;
-                //Debug.Log(String.Format("Just hit Terrain at coordinates [{0:0.##},{1:0.##}]", x,y));
-                /*
-                float[,] newHeights = new float [1,1];
-                newHeights[0,0] = 0.1f;
-                terrain.terrainData.SetHeights(x, y , newHeights);
-                */
-            }
-            /*
-            float[,] heights = terrain.terrainData.GetHeights(0, 0, xRes, yRes);
-            */
-        }
     }
 }
