@@ -12,6 +12,7 @@ namespace Beyond
 
         public LayerMask TerrainLayerMask;
 
+
         [SerializeField]
         private KeyCode newFundationHotKey = KeyCode.U;
         private KeyCode newWallHotKey = KeyCode.I;
@@ -33,18 +34,17 @@ namespace Beyond
 
                 if (currentPlaceableObject != null)
                 {
-                    bool wasRotated = RotateFromMouseWheel();
-                    bool heightWasAdjusted = MouseHeightOverride();
-                    if (Input.mousePosition!=mousePosition || wasRotated || heightWasAdjusted)
-                    { // only move placeable object when mouse has moved
+                    //bool wasRotated = RotateFromMouseWheel();
+                    RotateFromMouseWheel();
+                    //if (Input.mousePosition!=mousePosition || wasRotated)
+                    //{ // only move placeable object when mouse has moved
                         mousePosition = Input.mousePosition;
                         MovePlaceableObjectToMouse();
-                    }
+                    //}
+
                     // Make the placeable red or green based on whether it can be placed
-                    //TODO: this belong inside the BeyondCOmponent itself
-                    Renderer r = currentPlaceableObject.GetComponent<Renderer>();
-                    r.material.color = (ConstraintController.CanPlace(currentPlaceableObject) ? Color.green : Color.red);
-                    ReleaseIfClicked();
+                    UIController.Instance.SetCanPlaceObjectColour(currentPlaceableObject) ;
+                    PlaceOnClic();
                 }
             }
             else if (currentPlaceableObject != null)
@@ -55,46 +55,37 @@ namespace Beyond
         }
         private void MovePlaceableObjectToMouse()
         {
-            Ray ray = Camera.main.ScreenPointToRay(mousePosition);
-            //TODO FIRST : Really not sure non-foundation should be positioned on terrain, what's the point ? They have to  snap !
-            // INSTEAD -> Move them freely in 3D (with mouse wheel giving depth) and snap accordingly
-            // CONCLUSION : this layer mask depends on the template being placed 
-
-            bool ShowOnTerrain = currentPlaceableBeyondComponent.template.name == "Foundation" ;
+            Ray ray1 = Camera.main.ScreenPointToRay(mousePosition);
             RaycastHit hitInfo;
-            if (Physics.Raycast(ray, out hitInfo, 250f, (ShowOnTerrain ? ConstraintController.getTerrainMask() : ConstraintController.getBuildingsMask())))
+
+            // filter the raycast based on whether this template should be shown on terrain or not
+            LayerMask layerMask = (ConstraintController.ShowOnTerrain(currentPlaceableBeyondComponent.template) ? ConstraintController.getTerrainMask() : ConstraintController.getBuildingsMask()) ;
+            Vector3 position ;
+
+            if (Physics.Raycast(ray1, out hitInfo, UIController.Instance.forwardOffset , layerMask))
             {
-                Vector3 pointHit = hitInfo.point;
-                Vector3 position = ConstraintController.GetValidPositionFromMouse(currentPlaceableObject , pointHit);
-                position.y += UIController.Instance.heightOffset;
-                //If I'm snapped, only move if I'm a bit far from my current position
-                // TODO : see hardcoded bit in MovePlaceableObject: Can I give better offsets for mouse positionning ?
-                if (currentPlaceableBeyondComponent.beyondGroup!=null)
-                {
-                    if (Vector3.Distance(position , currentPlaceableObject.transform.position) > groupSnapTolerance)
-                    {
-                        MovePlaceableObject(position);
-                    }
-                }
-                else
-                {
-                    MovePlaceableObject(position);
-                }
-                // Unset the group before trying to snap or weird things happen
-                currentPlaceableBeyondComponent.unsetObjectGroup();
-                Snap();
+                position = ConstraintController.GetValidTerrainPointForObject(currentPlaceableObject , hitInfo.point);
             }
+            else
+            { // If we don't hit terrain, just make the object float in front of us
+                Ray ray2 = Camera.main.ScreenPointToRay(mousePosition);
+                position = Camera.main.transform.position + ray2.direction * UIController.Instance.forwardOffset ;
+            }
+
+            // If I'm in a group, I'm snapped, so only move if I'm a bit far from my current position
+            if (currentPlaceableBeyondComponent.beyondGroup==null || Vector3.Distance(position , currentPlaceableObject.transform.position) > groupSnapTolerance)
+            {
+                MovePlaceableObject(position);
+            }
+            Snap();
         }
 
         private void MovePlaceableObject(Vector3 p , Quaternion? r = null)
         {
             currentPlaceableObject.transform.position = p ;
-            if (currentPlaceableBeyondComponent.template.name != "Foundation")
-            { // TODO : very hardcoded. Can I give better offsets for mouse positionning ? put it back in MovePlaceableObjectToMouse ?
-              // TODO: clearly, the pivotOffset works well for Foundations and Walls, badly for floors.
+              // TODO: clearly, the pivotOffset works well for Foundations average for Walls, badly for floors.
               // TODO: BECAUSE, I need a specific point per template to anchor the mouse to 
-                currentPlaceableObject.transform.position += currentPlaceableBeyondComponent.template.pivotOffset + Vector3.up*0.5f;
-            } 
+            currentPlaceableObject.transform.position += currentPlaceableBeyondComponent.template.pivotOffset + Vector3.up*0.5f;
             if (r != null)
             {
                 currentPlaceableObject.transform.rotation = (Quaternion)r;
@@ -103,6 +94,9 @@ namespace Beyond
 
         private void Snap()
         {
+            // Unset the group before trying to snap or weird things happen
+            currentPlaceableBeyondComponent.unsetObjectGroup();
+
             // 1 - what groups are close to currentPlaceableObject ?
             BeyondGroup closestGroup ;
             findCloseGroups(currentPlaceableBeyondComponent , out closestGroup);
@@ -138,7 +132,6 @@ namespace Beyond
 
                     // Not needed aymore-angle between the rotation of the group and the rotation of the object on the Y axis : float angle = Mathf.Abs(currentPlaceableObject.transform.rotation.eulerAngles.y - closestGroup.rotation.eulerAngles.y );
 
-                    //TODO : unfortunately, this is wrong. the rotation of the placeable object is irrelevant: snap to the side from which the object is closest !
                     // Then we can pass snapToSide directly
                     if (ConstraintController.CanSnapToGroupHere(closestGroup , diffInt2 , currentPlaceableBeyondComponent.template , snappedPosition - pointWithOffset , out snapToSide))
                     {
@@ -207,46 +200,21 @@ namespace Beyond
         {
             if (currentPlaceableObject == null)
             {
-                Template template = TemplateController.Instance.templates[templateName];
-                UIController.Instance.SetHeighOffset(0);
-                //TODO : this will be inside the template controller.
-                currentPlaceableObject = Instantiate(template.prefab);
-                //TODO: Un-hardcode this shit
-                currentPlaceableObject.layer = 0 ;
-                //TODO : need to experiment with BoxColldier & trigger
-                currentPlaceableObject.GetComponent<BoxCollider>().enabled = true;
-                currentPlaceableBeyondComponent = currentPlaceableObject.AddComponent<BeyondComponent>();
-                currentPlaceableBeyondComponent.setTemplate(template);
+                TemplateController.CreateObject(templateName , ref currentPlaceableObject , ref currentPlaceableBeyondComponent) ;
             }
             else
             {
-                //Debug.Log("Destroyed currentPlaceableObject " + currentPlaceableObject.GetInstanceID() + " when i re-pressed the place key");
                 Destroy(currentPlaceableObject);
             }
         }
-        private void ReleaseIfClicked()
+        private void PlaceOnClic()
         {
             if (Input.GetMouseButtonDown(0))
             {
                 if (ConstraintController.CanPlace(currentPlaceableObject))
                 {
-                    // Set the material back to the prefab's material to get rid of the green or red colours
-                    currentPlaceableObject.GetComponent<Renderer>().material = TemplateController.prefabMaterial(currentPlaceableBeyondComponent.template);
-                    // TODO : Really need to think hard about this: will the box collider as trigger really be a general case for all elements ?
-                    currentPlaceableObject.GetComponent<BoxCollider>().isTrigger = false;
-                    currentPlaceableObject.GetComponent<BoxCollider>().enabled = true;
-                    //TODO: Un-hardcode this shit
-                    currentPlaceableObject.layer = 9 ;
-                    currentPlaceableBeyondComponent.SetState(BC_State.Blueprint) ;
-                    currentPlaceableObject.name = currentPlaceableBeyondComponent.template.name + "_" + (nbObjectsPlaced++);
-                    // if the object was not snapped to a group, create a new group
-                    if(currentPlaceableBeyondComponent.beyondGroup==null)
-                    {
-                        PlaceController.Instance.CreateNewBeyondGroup(currentPlaceableBeyondComponent);
-                    }
-                    currentPlaceableObject = null;
-                    //snapped = false;
-                    //TODO : If SHIFT is pressed, allow queuing of objects to be placed
+                    string name = currentPlaceableBeyondComponent.template.name + "_" + (nbObjectsPlaced++) ;
+                    TemplateController.PlaceObject(ref currentPlaceableObject , name) ;
                 }
                 else
                 {
@@ -267,24 +235,7 @@ namespace Beyond
             return false;
         }
 
-        private bool MouseHeightOverride()
-        {
-            if (Input.GetKey(KeyCode.LeftControl))
-            {
-                if (Input.mouseScrollDelta.y>0)
-                {
-                    UIController.Instance.SetHeighOffset(0 , 0.1f) ;
-                }
-                else if (Input.mouseScrollDelta.y < 0)
-                {
-                    UIController.Instance.SetHeighOffset(0 , -0.1f);
-                }
-                return true;
-            }
-            return false;
-        }
-
-        //TODO : I should really place those into another class, specifically for that typoe of manipulation
+        //TODO : I should really place those into another class, specifically for that type of manipulation
         public static Vector3 RotateAroundPoint(Vector3 p , Vector3 pivot , Quaternion r)
         {
             return r * (p - pivot) + pivot ;

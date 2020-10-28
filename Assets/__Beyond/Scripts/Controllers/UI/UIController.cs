@@ -13,7 +13,10 @@ namespace Beyond
         TextMeshProUGUI TM_CurrentPosition ;
         public BeyondGroup closestGroup {get; protected set;}
         public Vector3Int positionInGroup ;
-        public float heightOffset {get; protected set;}
+        public float forwardOffset {get; protected set;}
+        private float mouseWheelDelta;
+
+        float MinForwardOffset = 1.5f;
 
 
         void Awake()
@@ -21,6 +24,8 @@ namespace Beyond
             TM_CurrentPosition = GameObject.Find("Label_CurrentPosition").GetComponent<TextMeshProUGUI>();
             TM_Infos = GameObject.Find("Label_Infos").GetComponent<TextMeshProUGUI>() ;
             positionInGroup = new Vector3Int(-999,-999,-999);
+            forwardOffset = 10f; // By default, try to place objects 10 units away from camera
+            mouseWheelDelta = 0;
         }
 
         void OnEnable()
@@ -33,35 +38,14 @@ namespace Beyond
             setGameMode(gameMode.free);
         }
 
-        public void SetHeighOffset(float h , float delta=0)
-        {
-            if (delta!=0)
-            {
-                heightOffset+=delta;
-
-            }
-            else
-            {
-                heightOffset = h ;
-            }
-        }
-
-
         // Update is called once per frame
         void Update()
         {
             // TAB changes gameMode
-            if (Input.GetKeyDown(KeyCode.Tab))
-            {
-                if (gameMode == gameMode.free)
-                {
-                    setGameMode(gameMode.build);
-                }
-                else if (gameMode == gameMode.build)
-                {
-                    setGameMode(gameMode.free);
-                }
-            }
+            ChangeGameMode();
+
+            // CTRL + MouseWheel change the forward offset
+            ChangeForwardOffset_MouseWheel() ;
 
             Place place = PlaceController.Instance.place ;
 
@@ -73,6 +57,34 @@ namespace Beyond
             Vector3 FPposition = FirstPersonController.Instance.transform.position ;
             TM_CurrentPosition.text = string.Format("X={0:0.00};Y={1:0.00};Z={2:0.00}\nClosest group: {3}, {4}" , FPposition.x ,FPposition.y , FPposition.z , (closestGroup==null ? "N/A" : closestGroup.name) , positionInGroup);
         }
+
+        void ChangeGameMode()
+        {
+            if (Input.GetKeyDown(KeyCode.Tab))
+            {
+                if (gameMode == gameMode.free)
+                {
+                    setGameMode(gameMode.build);
+                }
+                else if (gameMode == gameMode.build)
+                {
+                    setGameMode(gameMode.free);
+                }
+            }
+        }
+
+        bool ChangeForwardOffset_MouseWheel()
+        {
+            if (Input.GetKey(KeyCode.LeftControl) && (mouseWheelDelta  != Input.mouseScrollDelta.y))
+            {
+                mouseWheelDelta = Input.mouseScrollDelta.y;
+                forwardOffset += mouseWheelDelta ;
+                forwardOffset = Mathf.Max(forwardOffset , MinForwardOffset) ;
+                return true;
+            }
+            return false;
+        }
+
 
         public void setGameMode(gameMode gm)
         { // Show the cursor only in interface mode
@@ -92,6 +104,13 @@ namespace Beyond
         public void SetClosestGroup(BeyondGroup g)
         {
             closestGroup = g ;
+        }
+
+        public void SetCanPlaceObjectColour(GameObject g)
+        {
+            Renderer r = g.GetComponent<Renderer>();
+            r.material.color = (ConstraintController.CanPlace(g) ? Color.green : Color.red);
+
         }
 
     }

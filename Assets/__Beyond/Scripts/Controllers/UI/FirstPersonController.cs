@@ -34,8 +34,8 @@ namespace Beyond
         // Update is called once per frame
         void Update()
         {
-            if (UIController.Instance.gameMode == gameMode.free)
-            {
+            //if (UIController.Instance.gameMode == gameMode.free)
+            //{
                 timer += Time.deltaTime;
                 if (timer > 0.2f)
                 {
@@ -63,7 +63,7 @@ namespace Beyond
 
                 velocity.y += gravity * Time.deltaTime * 5f;
                 cc.Move(velocity * Time.deltaTime);
-            }
+            //}
         }
     }
 }

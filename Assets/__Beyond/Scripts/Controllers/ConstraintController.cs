@@ -61,9 +61,15 @@ namespace Beyond
             //5 - Think of moveable objects later (they're not in groups, so they don't snap = constraints are easier)
         }
 
+        // TODO : should this really be hardcoded this badly ? I might not need to even put that in the templates but just have a list somewhere
+        public static bool ShowOnTerrain(Template t)
+        {
+            return t.name == "Foundation" ;
+        }
+
         //IMPORTANT : go.transform.position cannot be used since we're trying to place the GameObject through this method
         //rotation is fine (even if we just created the go, rotation will just be Quaternion.Identity)
-        public static Vector3 GetValidPositionFromMouse(GameObject go , Vector3 pointOnTerrain)
+        public static Vector3 GetValidTerrainPointForObject(GameObject go , Vector3 pointOnTerrain)
         {
             if (go == null) return pointOnTerrain;
             BeyondComponent bc = go.GetComponent<BeyondComponent>();
@@ -74,8 +80,6 @@ namespace Beyond
             
             if (bc.template.name=="Foundation")
             {
-                // A foundation should never have a negative height offset or it would go into the ground
-                UIController.Instance.SetHeighOffset(Mathf.Max(UIController.Instance.heightOffset , 0));
                 result = GetPointOnTerrain(go , pointOnTerrain) ;
             }
             // If GO is not a foundation, it has to snap with something so we don't care about Terrain
@@ -111,7 +115,7 @@ namespace Beyond
                 if (IsTemplatePresentHere(group , new Vector3Int(here.x+1 , here.y , here.z), "Foundation")) return true ;
                 if (IsTemplatePresentHere(group , new Vector3Int(here.x , here.y , here.z-1), "Foundation")) return true ;
                 if (IsTemplatePresentHere(group , new Vector3Int(here.x , here.y , here.z+1), "Foundation")) return true ;
-                Debug.Log("No neighbouring foundation");
+                //Debug.Log("No neighbouring foundation");
                 return false;
             }
             if (t.name=="Wall")
@@ -132,11 +136,6 @@ namespace Beyond
                     } 
                     return true ; 
                 }
-                // Or a wall next to here
-                if (IsTemplatePresentHere(group , new Vector3Int(here.x-1 , here.y , here.z), "Wall")) return true ;
-                if (IsTemplatePresentHere(group , new Vector3Int(here.x+1 , here.y , here.z), "Wall")) return true ;
-                if (IsTemplatePresentHere(group , new Vector3Int(here.x , here.y , here.z-1), "Wall")) return true ;
-                if (IsTemplatePresentHere(group , new Vector3Int(here.x , here.y , here.z+1), "Wall")) return true ;
             }
             if (t.name=="Wallhole")
             {
@@ -168,6 +167,11 @@ namespace Beyond
                 {
                     return true ; 
                 }
+                // Or a floor next to here
+                if (IsTemplatePresentHere(group , new Vector3Int(here.x-1 , here.y , here.z), "Floor")) return true ;
+                if (IsTemplatePresentHere(group , new Vector3Int(here.x+1 , here.y , here.z), "Floor")) return true ;
+                if (IsTemplatePresentHere(group , new Vector3Int(here.x , here.y , here.z-1), "Floor")) return true ;
+                if (IsTemplatePresentHere(group , new Vector3Int(here.x , here.y , here.z+1), "Floor")) return true ;
             }
             sts = cellSide.Down ; // because I need a default
             return false ;

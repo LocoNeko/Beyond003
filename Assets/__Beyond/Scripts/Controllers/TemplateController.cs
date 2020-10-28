@@ -55,6 +55,40 @@ namespace Beyond
             //TODO - WallOpened
         }
 
+
+        public static void CreateObject(string templateName , ref GameObject go , ref BeyondComponent bc)
+        {
+            Template template = TemplateController.Instance.templates[templateName];
+            go = Instantiate(template.prefab);
+            //TODO: Un-hardcode this shit
+            go.layer = 0 ;
+            //TODO : need to experiment with BoxColldier & trigger
+            go.GetComponent<BoxCollider>().enabled = true;
+            bc = go.AddComponent<BeyondComponent>();
+            bc.setTemplate(template);
+        }
+
+        public static void PlaceObject(ref GameObject go , string name)
+        {
+            BeyondComponent bc = go.GetComponent<BeyondComponent>() ;
+            // Set the material back to the prefab's material to get rid of the green or red colours
+            go.GetComponent<Renderer>().material = prefabMaterial(bc.template);
+            // TODO : Really need to think hard about this: will the box collider as trigger really be a general case for all elements ?
+            go.GetComponent<BoxCollider>().isTrigger = false;
+            go.GetComponent<BoxCollider>().enabled = true;
+            //TODO: Un-hardcode this shit
+            go.layer = 9 ;
+            bc.SetState(BC_State.Blueprint) ;
+            go.name = name ;
+            // if the object was not snapped to a group, create a new group
+            if(bc.beyondGroup==null)
+            {
+                PlaceController.Instance.CreateNewBeyondGroup(bc);
+            }
+            go = null;
+            //TODO : If SHIFT is pressed, allow queuing of objects to be placed
+        }
+
         public static Material prefabMaterial(Template t)
         {
             return t.prefab.GetComponent<Renderer>().sharedMaterial;

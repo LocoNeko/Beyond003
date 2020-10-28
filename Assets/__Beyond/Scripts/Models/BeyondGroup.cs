@@ -3,6 +3,7 @@ using UnityEngine;
 
 namespace Beyond
 {
+    [System.Serializable]
     public class BeyondGroup
     {
         public Vector3 position { get; protected set;}
