@@ -21,7 +21,7 @@ namespace Beyond
         private BeyondComponent currentPlaceableBeyondComponent;
         private float mouseWheelRotation;
 
-        public float groupSnapTolerance = 0.2f;
+        public float groupSnapTolerance = 0.5f;
         Vector3 mousePosition;
         int nbObjectsPlaced=0;
 
@@ -56,13 +56,13 @@ namespace Beyond
         private void MovePlaceableObjectToMouse()
         {
             Ray ray = Camera.main.ScreenPointToRay(mousePosition);
-            // TODO FIRST : I think this is were my wall ghost position fails and returns a bad position within the group it snaps to
             //TODO FIRST : Really not sure non-foundation should be positioned on terrain, what's the point ? They have to  snap !
             // INSTEAD -> Move them freely in 3D (with mouse wheel giving depth) and snap accordingly
             // CONCLUSION : this layer mask depends on the template being placed 
 
+            bool ShowOnTerrain = currentPlaceableBeyondComponent.template.name == "Foundation" ;
             RaycastHit hitInfo;
-            if (Physics.Raycast(ray, out hitInfo, 250f, ConstraintController.getTerrainMask()))
+            if (Physics.Raycast(ray, out hitInfo, 250f, (ShowOnTerrain ? ConstraintController.getTerrainMask() : ConstraintController.getBuildingsMask())))
             {
                 Vector3 pointHit = hitInfo.point;
                 Vector3 position = ConstraintController.GetValidPositionFromMouse(currentPlaceableObject , pointHit);
@@ -71,7 +71,7 @@ namespace Beyond
                 // TODO : see hardcoded bit in MovePlaceableObject: Can I give better offsets for mouse positionning ?
                 if (currentPlaceableBeyondComponent.beyondGroup!=null)
                 {
-                    if (Vector3.Distance(position , currentPlaceableObject.transform.position) >0.2f)
+                    if (Vector3.Distance(position , currentPlaceableObject.transform.position) > groupSnapTolerance)
                     {
                         MovePlaceableObject(position);
                     }
@@ -91,7 +91,9 @@ namespace Beyond
             currentPlaceableObject.transform.position = p ;
             if (currentPlaceableBeyondComponent.template.name != "Foundation")
             { // TODO : very hardcoded. Can I give better offsets for mouse positionning ? put it back in MovePlaceableObjectToMouse ?
-                currentPlaceableObject.transform.position += currentPlaceableBeyondComponent.template.pivotOffset;
+              // TODO: clearly, the pivotOffset works well for Foundations and Walls, badly for floors.
+              // TODO: BECAUSE, I need a specific point per template to anchor the mouse to 
+                currentPlaceableObject.transform.position += currentPlaceableBeyondComponent.template.pivotOffset + Vector3.up*0.5f;
             } 
             if (r != null)
             {
@@ -110,17 +112,10 @@ namespace Beyond
 
                 // Find the centre where I should place the object based on the group's "root" position and the Vector3Int difference between there and here
                 // 1 - where would the cell centre be, considering the offset of this placeable object's template
-                // TODO : this is already wrong :  walls rotate, and base on that the cell's centre is not that
                 Vector3 pointWithOffset = currentPlaceableBeyondComponent.transform.position - currentPlaceableBeyondComponent.template.pivotOffset;
                 
-                // 2 - calculate the difference between this point and the group's centre and apply the inverse rotation for the group
+                // 2 - calculate the difference between this point and the group's centre and apply the inverse rotation for the group so we can compare in a non-rotated way
                 pointWithOffset = RotateAroundPoint(pointWithOffset , closestGroup.position , Quaternion.Inverse(closestGroup.rotation));
-                /*
-                The statement above should be equivalent to the 3 lines below
-                Vector3 diff = pointWithOffset - closestGroup.position ;
-                diff = Quaternion.Inverse(closestGroup.rotation) * diff ;
-                pointWithOffset = diff + closestGroup.position ;
-                */
 
                 // 3 - Obtain the equivalent Integer Vector3, which represents how many cells the object is from the group's centre
                 Vector3Int diffInt2 = Vector3Int.RoundToInt(pointWithOffset - closestGroup.position);
@@ -128,20 +123,11 @@ namespace Beyond
 
                 // 4 - This is the position of the centre of the cell
                 Vector3 snappedPosition = closestGroup.position + (Vector3)diffInt2; //FIXME + currentPlaceableBeyondComponent.template.pivotOffset;
-                Vector3 snappedPositionDebug = snappedPosition ;
 
                 // 5 - Rotate it by the group's rotation for final result
                 snappedPosition = RotateAroundPoint(snappedPosition , closestGroup.position , closestGroup.rotation) ;
-                /*
-                The statement above should be equivalent to the 3 lines below
-                Vector3 direction = snappedPosition - closestGroup.position ;
-                direction = closestGroup.rotation * direction ;
-                snappedPosition = direction + closestGroup.position ;
-                */
 
-                //Debug.Log("snap to object in position "+diffInt2+" group rotation changed the position by: "+(snappedPositionDebug-snappedPosition));
-                // TODO : move all constraints to ConstraintController
-
+                // TODO : move this constraint to ConstraintController
                 // Test to see if foundation is above groud like in GetValidPositionFromMouse
                 Vector3 point = ConstraintController.GetPointOnTerrain(currentPlaceableObject , currentPlaceableObject.transform.position) ;
                 float minY = point.y ;
@@ -150,28 +136,22 @@ namespace Beyond
                 { // Snap in place only if object's top is above ground
                     cellSide snapToSide;
 
-                    // TODO: Not needed aymore: angle between the rotation of the group and the rotation of the object on the Y axis
-                    // float angle = Mathf.Abs(currentPlaceableObject.transform.rotation.eulerAngles.y - closestGroup.rotation.eulerAngles.y );
+                    // Not needed aymore-angle between the rotation of the group and the rotation of the object on the Y axis : float angle = Mathf.Abs(currentPlaceableObject.transform.rotation.eulerAngles.y - closestGroup.rotation.eulerAngles.y );
 
                     //TODO : unfortunately, this is wrong. the rotation of the placeable object is irrelevant: snap to the side from which the object is closest !
                     // Then we can pass snapToSide directly
-                    // TODO : so we need a distance not an angle
                     if (ConstraintController.CanSnapToGroupHere(closestGroup , diffInt2 , currentPlaceableBeyondComponent.template , snappedPosition - pointWithOffset , out snapToSide))
                     {
                         currentPlaceableObject.transform.position = snappedPosition ;
                         currentPlaceableBeyondComponent.setObjectGroup(closestGroup ,diffInt2 , snapToSide);
                     }
-                    /*
-                    else
-                    {
-                        Debug.Log("Can't snap here because of group constraints");
-                    }
-                    */
+                    // else Debug.Log("Can't snap here because of group constraints");
                 }
             }
             else
             {
                 currentPlaceableBeyondComponent.unsetObjectGroup();
+                // TODO : gros caca
                 UIController.Instance.positionInGroup = new Vector3Int(-999,-999,-999);
             }
         }
@@ -231,6 +211,8 @@ namespace Beyond
                 UIController.Instance.SetHeighOffset(0);
                 //TODO : this will be inside the template controller.
                 currentPlaceableObject = Instantiate(template.prefab);
+                //TODO: Un-hardcode this shit
+                currentPlaceableObject.layer = 0 ;
                 //TODO : need to experiment with BoxColldier & trigger
                 currentPlaceableObject.GetComponent<BoxCollider>().enabled = true;
                 currentPlaceableBeyondComponent = currentPlaceableObject.AddComponent<BeyondComponent>();
@@ -253,6 +235,8 @@ namespace Beyond
                     // TODO : Really need to think hard about this: will the box collider as trigger really be a general case for all elements ?
                     currentPlaceableObject.GetComponent<BoxCollider>().isTrigger = false;
                     currentPlaceableObject.GetComponent<BoxCollider>().enabled = true;
+                    //TODO: Un-hardcode this shit
+                    currentPlaceableObject.layer = 9 ;
                     currentPlaceableBeyondComponent.SetState(BC_State.Blueprint) ;
                     currentPlaceableObject.name = currentPlaceableBeyondComponent.template.name + "_" + (nbObjectsPlaced++);
                     // if the object was not snapped to a group, create a new group

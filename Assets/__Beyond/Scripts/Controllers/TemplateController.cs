@@ -51,7 +51,6 @@ namespace Beyond
                 pivotOffset: new Vector3(0, -0.45f, 0f) ,
                 constraints: null
             ));
-            //TODO - Level
             //TODO - Roof
             //TODO - WallOpened
         }

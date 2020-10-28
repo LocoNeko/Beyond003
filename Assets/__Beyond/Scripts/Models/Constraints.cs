@@ -15,6 +15,12 @@ namespace Beyond
         public List<int> cellSides {get; protected set;}
         public float depth {get; protected set;}
 
+        public Constraints()
+        {
+
+        }
+
+        //TODO : nope. Make static methods for each type of constraint
         public Constraints(string op, List<Constraints> cl , List<Template> tl , List<Vector3Int> ol, List<int> csl ,float d)
         {
             operation = op;
@@ -60,6 +66,30 @@ namespace Beyond
                 default:
                     return;
             }
+        }
+
+        public static Constraints Create_OR(List<Constraints> cl)
+        {
+            Constraints c = new Constraints();
+            c.operation = "OR";
+            c.constraintsList = new List<Constraints>() ;
+            foreach (Constraints c2 in cl)
+            {
+                c.constraintsList.Add(c2);
+            }
+            return c ;
+        }
+
+        public static Constraints Create_AND(List<Constraints> cl)
+        {
+            Constraints c = new Constraints();
+            c.operation = "AND";
+            c.constraintsList = new List<Constraints>() ;
+            foreach (Constraints c2 in cl)
+            {
+                c.constraintsList.Add(c2);
+            }
+            return c ;
         }
     }
 }

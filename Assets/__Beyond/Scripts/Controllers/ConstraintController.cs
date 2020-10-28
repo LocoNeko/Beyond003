@@ -132,6 +132,11 @@ namespace Beyond
                     } 
                     return true ; 
                 }
+                // Or a wall next to here
+                if (IsTemplatePresentHere(group , new Vector3Int(here.x-1 , here.y , here.z), "Wall")) return true ;
+                if (IsTemplatePresentHere(group , new Vector3Int(here.x+1 , here.y , here.z), "Wall")) return true ;
+                if (IsTemplatePresentHere(group , new Vector3Int(here.x , here.y , here.z-1), "Wall")) return true ;
+                if (IsTemplatePresentHere(group , new Vector3Int(here.x , here.y , here.z+1), "Wall")) return true ;
             }
             if (t.name=="Wallhole")
             {
