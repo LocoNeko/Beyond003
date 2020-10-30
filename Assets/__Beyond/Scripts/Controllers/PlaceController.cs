@@ -25,6 +25,27 @@ namespace Beyond
             place = new Place();
         }
 
+        public void Load(SavedGame game)
+        {
+            place = game.place ;
+            // I need to initiate the componentList of the group. It doesn't exist as it can't be serialised
+            foreach (SavedComponent data in game.components)
+            {
+                GameObject go = Instantiate(TemplateController.Instance.templates[data.template].prefab) ;
+                BeyondComponent bc = go.AddComponent<BeyondComponent>() ;
+                bc.LoadComponent(data) ;
+                go.SetActive(false) ;
+                go.transform.position = data.position ;
+                go.transform.rotation = data.rotation ;
+                go.name = data.name ;
+                go.layer = data.layer ;
+                go.GetComponent<BoxCollider>().isTrigger = data.isTrigger ;
+                go.GetComponent<BoxCollider>().enabled = data.enabled ;
+                go.SetActive(true);
+                place.beyondGroups.Find(group => group == data.group).addBeyondComponent(bc) ;
+            }
+        }
+
         public void CreateNewBeyondGroup(BeyondComponent bc , string name=null)
         {
             if (name == null)

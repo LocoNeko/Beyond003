@@ -1,4 +1,4 @@
-﻿using System.Collections;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -9,7 +9,6 @@ namespace Beyond
     [System.Serializable]
     public class Place
     {
-        public static Place Instance;
         public string name { get; protected set; }
         public Hemisphere hemisphere { get; protected set; }
         public Gametime gametime { get; protected set; }

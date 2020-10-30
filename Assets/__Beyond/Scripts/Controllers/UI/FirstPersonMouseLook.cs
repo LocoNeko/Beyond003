@@ -9,7 +9,6 @@ namespace Beyond
     public class FirstPersonMouseLook : MonoBehaviour
     {
         public float mouseSensitivity = 100f;
-        //public Transform firstPerson;
         float xRotation = 0f;
 
 

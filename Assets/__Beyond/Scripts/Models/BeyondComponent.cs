@@ -35,6 +35,16 @@ namespace Beyond
             objectsTriggered = new HashSet<GameObject>();
         }
 
+        public void LoadComponent(SavedComponent sc)
+        {
+            template = TemplateController.Instance.templates[sc.template] ;
+            state = sc.state ;
+            beyondGroup = sc.group ;
+            side = sc.side ;
+            groupPosition = sc.groupPosition ;
+            cells = sc.cells ;
+        }
+
         public void setTemplate(Template t)
         {
             template = t;
@@ -176,8 +186,42 @@ namespace Beyond
         {
             objectsTriggered.Remove(c.gameObject);
         }
+    }
 
+    /*
+    * The SavedComponent serializable class will hold all information necessary to save and load BeyondComponents in their groups, and recreate gameObjects
+    */
 
+    [System.Serializable]
+    public class SavedComponent
+    {
+        public string template ;
+        public BC_State state ;
+        public BeyondGroup group ;
+        public cellSide side ;
+        public Vector3Int groupPosition ;
+        public List<Vector3Int> cells ;
+        public Vector3 position ;
+        public Quaternion rotation ;
+        public string name ;
+        public int layer ;
+        public bool isTrigger ;
+        public bool enabled ;
+        public SavedComponent(BeyondComponent bc)
+        {
+            template = bc.template.name ;
+            state = bc.state ;
+            group = bc.beyondGroup ;
+            side = bc.side ;
+            groupPosition = bc.groupPosition ;
+            cells = bc.cells ;
+            position = bc.transform.position ;
+            rotation = bc.transform.rotation ;
+            name = bc.transform.gameObject.name ;
+            layer = bc.transform.gameObject.layer ;
+            isTrigger = bc.transform.gameObject.GetComponent<BoxCollider>().isTrigger ;
+            enabled = bc.transform.gameObject.GetComponent<BoxCollider>().enabled ;
+        }
     }
 
 }

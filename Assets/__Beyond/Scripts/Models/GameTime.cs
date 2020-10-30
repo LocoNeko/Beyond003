@@ -6,6 +6,7 @@ namespace Beyond
 {
     public enum Season : int { Winter, Spring, Summer, Autumn }
 
+    [System.Serializable]
     public class Gametime
     {
         public static List<int> AllowedSpeeds = new List<int> { 0, 1, 2, 3, 4, 5 };

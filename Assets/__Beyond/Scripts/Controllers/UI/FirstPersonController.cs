@@ -65,5 +65,20 @@ namespace Beyond
                 cc.Move(velocity * Time.deltaTime);
             //}
         }
+
+        public void Save(ref SavedGame game)
+        {
+            game.fp_position = SavedGame.Vector3ToFloat(transform.position) ;
+            game.fp_rotation = SavedGame.QuaternionToFloat(transform.rotation) ;
+        }
+
+        public void Load(SavedGame game)
+        {
+            cc.enabled = false;
+            cc.transform.position = SavedGame.Vector3FromFloat(game.fp_position) ;
+            cc.transform.rotation = SavedGame.QuaternionFromFloat(game.fp_rotation) ;
+            cc.enabled = true;
+        }
+
     }
 }
