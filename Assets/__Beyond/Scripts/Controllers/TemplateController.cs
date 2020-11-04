@@ -60,6 +60,7 @@ namespace Beyond
         }
 
 
+        /*
         public static void CreateObject(string templateName , ref GameObject go , ref BeyondComponent bc)
         {
             Template template = TemplateController.Instance.templates[templateName];
@@ -71,6 +72,7 @@ namespace Beyond
             bc = go.AddComponent<BeyondComponent>();
             bc.setTemplate(template);
         }
+        */
 
         //TODO : refactor my code to use this methid instead of the one above witrh refs
         public static BeyondComponent CreateObject(string templateName)
@@ -86,10 +88,9 @@ namespace Beyond
             return bc ;
         }
 
-        public static void PlaceObject(ref GameObject go , string name , BC_State state = BC_State.Blueprint)
+        public static void PlaceObject(BeyondComponent bc , string name , BC_State state = BC_State.Blueprint)
         {
-            BeyondComponent bc = go.GetComponent<BeyondComponent>() ;
-            go.name = name ;
+            bc.gameObject.name = name ;
 
             // if the object was not snapped to a group, create a new group
             if(bc.beyondGroup==null)
@@ -97,29 +98,19 @@ namespace Beyond
                 PlaceController.Instance.CreateNewBeyondGroup(bc);
             }
             // TODO : Really need to think hard about this: will the box collider as trigger really be a general case for all elements ?
-            go.GetComponent<BoxCollider>().isTrigger = false;
-            go.GetComponent<BoxCollider>().enabled = true;
+            bc.gameObject.GetComponent<BoxCollider>().isTrigger = false;
+            bc.gameObject.GetComponent<BoxCollider>().enabled = true;
             //TODO: Un-hardcode this shit
-            go.layer = 9 ;
+            bc.gameObject.layer = 9 ;
             // TODO clean this once dragging is beautiful
             if (state==BC_State.Blueprint)
             {
-                // Set the material back to the prefab's material to get rid of the green or red colours
-                go.GetComponent<Renderer>().material = prefabMaterial(bc.template);
                 bc.SetState(BC_State.Blueprint) ;
-                go = null;
             }
             if (state==BC_State.Ghost)
             { // When dragging, we place ghosts rather than blueprints
                 bc.SetState(BC_State.Ghost) ;
             }
-        }
-
-        public static void GhostToBlueprint (GameObject go)
-        {
-            BeyondComponent bc = go.GetComponent<BeyondComponent>() ;
-            go.GetComponent<Renderer>().material = prefabMaterial(bc.template);
-            bc.SetState(BC_State.Blueprint) ;
         }
 
         public static Material prefabMaterial(Template t)

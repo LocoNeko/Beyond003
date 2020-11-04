@@ -11,8 +11,7 @@ namespace Beyond
         private KeyCode newWallHotKey = KeyCode.I;
         private KeyCode newFloorHotKey = KeyCode.O;
         private KeyCode newWallholeHotKey = KeyCode.P;
-        private GameObject currentPlaceableObject;
-        private BeyondComponent currentPlaceableBeyondComponent;
+        private BeyondComponent currentBC;
         List<BeyondComponent> draggedBC ;
         private float mouseWheelRotation;
         public float groupSnapTolerance = 0.5f;
@@ -36,7 +35,7 @@ namespace Beyond
             { //All this should only happens when gameMode=build
                 HandleNewObjectHotkey();
 
-                if (currentPlaceableObject != null)
+                if ( currentBC != null)
                 {
                     //bool wasRotated = RotateFromMouseWheel();
                     RotateFromMouseWheel();
@@ -47,15 +46,15 @@ namespace Beyond
                     //}
 
                     // Make the placeable red or green based on whether it can be placed
-                    ConstraintController.SetCanPlaceObjectColour(currentPlaceableObject) ;
+                    ConstraintController.SetCanPlaceObjectColour(currentBC) ;
                     Drag();
                     PlaceOnClic();
                 }
             }
-            else if (currentPlaceableObject != null)
+            else if (currentBC != null)
             { // Always destroy placeable object when we leave build mode
-                Destroy(currentPlaceableObject);  Debug.Log("Going off build mode destroyed placeable object");
-                currentPlaceableBeyondComponent = null;
+                Destroy(currentBC.gameObject);  Debug.Log("Going off build mode destroyed placeable object");
+                currentBC = null;
             }
         }
         private void MovePlaceableObjectToMouse()
@@ -64,13 +63,13 @@ namespace Beyond
             RaycastHit hitInfo;
 
             // filter the raycast based on whether this template should be shown on terrain or not
-            LayerMask layerMask = (ConstraintController.ShowOnTerrain(currentPlaceableBeyondComponent.template) ? ConstraintController.getTerrainMask() : ConstraintController.getBuildingsMask()) ;
+            LayerMask layerMask = (ConstraintController.ShowOnTerrain(currentBC.template) ? ConstraintController.getTerrainMask() : ConstraintController.getBuildingsMask()) ;
             Vector3 position ;
 
             //TODO : 999f ? really ??
             if (Physics.Raycast(ray1, out hitInfo, /*UIController.Instance.forwardOffset*/ 999f , layerMask))
             {
-                position = ConstraintController.GetValidTerrainPointForObject(currentPlaceableObject , hitInfo.point);
+                position = ConstraintController.GetValidTerrainPointForObject(currentBC , hitInfo.point);
             }
             else
             { // If we don't hit terrain, just make the object float in front of us
@@ -79,7 +78,7 @@ namespace Beyond
             }
 
             // If I'm in a group, I'm snapped, so only move if I'm a bit far from my current position
-            if (currentPlaceableBeyondComponent.beyondGroup==null || Vector3.Distance(position , currentPlaceableObject.transform.position) > groupSnapTolerance)
+            if (currentBC.beyondGroup==null || Vector3.Distance(position , currentBC.transform.position) > groupSnapTolerance)
             {
                 MovePlaceableObject(position);
             }
@@ -88,31 +87,31 @@ namespace Beyond
 
         private void MovePlaceableObject(Vector3 p , Quaternion? r = null)
         {
-            currentPlaceableObject.transform.position = p ;
+            currentBC.transform.position = p ;
               // TODO: clearly, the pivotOffset works well for Foundations average for Walls, badly for floors.
               // TODO: BECAUSE, I need a specific point per template to anchor the mouse to 
-            //currentPlaceableObject.transform.position += currentPlaceableBeyondComponent.template.pivotOffset ;
+            //currentPlaceableObject.transform.position += currentBC.template.pivotOffset ;
             if (r != null)
             {
-                currentPlaceableObject.transform.rotation = (Quaternion)r;
+                currentBC.transform.rotation = (Quaternion)r;
             }
         }
 
         private void Snap()
         {
             // Unset the group before trying to snap or weird things happen
-            currentPlaceableBeyondComponent.unsetObjectGroup();
+            currentBC.unsetObjectGroup();
 
             // 1 - what groups are close to currentPlaceableObject ?
             BeyondGroup closestGroup ;
-            findCloseGroups(currentPlaceableBeyondComponent , out closestGroup);
+            findCloseGroups(currentBC , out closestGroup);
             if (closestGroup!=null) 
             {
                 //Debug.Log("closestGroup"+closestGroup.name);
 
                 // Find the centre where I should place the object based on the group's "root" position and the Vector3Int difference between there and here
                 // 1 - where would the cell centre be, considering the offset of this placeable object's template
-                Vector3 pointWithOffset = currentPlaceableBeyondComponent.transform.position - currentPlaceableBeyondComponent.template.pivotOffset;
+                Vector3 pointWithOffset = currentBC.transform.position - currentBC.template.pivotOffset;
                 
                 // 2 - calculate the difference between this point and the group's centre and apply the inverse rotation for the group so we can compare in a non-rotated way
                 pointWithOffset = RotateAroundPoint(pointWithOffset , closestGroup.position , Quaternion.Inverse(closestGroup.rotation));
@@ -122,14 +121,14 @@ namespace Beyond
                 UIController.Instance.positionInGroup = diffInt2;
 
                 // 4 - This is the position of the centre of the cell
-                Vector3 snappedPosition = closestGroup.position + (Vector3)diffInt2; //FIXME + currentPlaceableBeyondComponent.template.pivotOffset;
+                Vector3 snappedPosition = closestGroup.position + (Vector3)diffInt2; //FIXME + currentBC.template.pivotOffset;
 
                 // 5 - Rotate it by the group's rotation for final result
                 snappedPosition = RotateAroundPoint(snappedPosition , closestGroup.position , closestGroup.rotation) ;
 
                 // TODO : move this constraint to ConstraintController
                 // Test to see if foundation is above groud like in GetValidPositionFromMouse
-                Vector3 point = ConstraintController.GetPointOnTerrain(currentPlaceableObject , currentPlaceableObject.transform.position) ;
+                Vector3 point = ConstraintController.GetPointOnTerrain(currentBC , currentBC.transform.position) ;
                 float minY = point.y ;
                 //TODO: Hardcode for the time being as I tweak GetPointOnTerrain
                 minY=0;
@@ -141,17 +140,17 @@ namespace Beyond
                     // Not needed aymore-angle between the rotation of the group and the rotation of the object on the Y axis : float angle = Mathf.Abs(currentPlaceableObject.transform.rotation.eulerAngles.y - closestGroup.rotation.eulerAngles.y );
 
                     // Then we can pass snapToSide directly
-                    if (ConstraintController.CanSnapToGroupHere(closestGroup , diffInt2 , currentPlaceableBeyondComponent.template , snappedPosition - pointWithOffset , out snapToSide))
+                    if (ConstraintController.CanSnapToGroupHere(closestGroup , diffInt2 , currentBC.template , snappedPosition - pointWithOffset , out snapToSide))
                     {
-                        currentPlaceableObject.transform.position = snappedPosition ;
-                        currentPlaceableBeyondComponent.setObjectGroup(closestGroup ,diffInt2 , snapToSide);
+                        currentBC.transform.position = snappedPosition ;
+                        currentBC.setObjectGroup(closestGroup ,diffInt2 , snapToSide);
                     }
                     // else Debug.Log("Can't snap here because of group constraints");
                 }
             }
             else
             {
-                currentPlaceableBeyondComponent.unsetObjectGroup();
+                currentBC.unsetObjectGroup();
                 // TODO : gros caca
                 UIController.Instance.positionInGroup = new Vector3Int(-999,-999,-999);
             }
@@ -206,16 +205,15 @@ namespace Beyond
 
         private void CreateNewPlaceableObject(string templateName)
         {
-            if (currentPlaceableObject == null)
+            if (currentBC == null)
             {
-                //TemplateController.CreateObject(templateName , ref currentPlaceableObject , ref currentPlaceableBeyondComponent) ;
+                //TemplateController.CreateObject(templateName , ref currentPlaceableObject , ref currentBC) ;
                 // refactored into :
-                currentPlaceableBeyondComponent = TemplateController.CreateObject(templateName) ;
-                currentPlaceableObject = currentPlaceableBeyondComponent.gameObject ;
+                currentBC = TemplateController.CreateObject(templateName) ;
             }
             else
             {
-                Destroy(currentPlaceableObject);  Debug.Log("CreateNewPlaceableobject destroyed placeable object");
+                Destroy(currentBC.gameObject);  Debug.Log("CreateNewPlaceableobject destroyed placeable object");
             }
         }
 
@@ -224,31 +222,30 @@ namespace Beyond
             // Start draggin (we have no draggedBC)
             if (Input.GetMouseButtonDown(0) && draggedBC.Count==0)
             {
-                if (ConstraintController.CanPlace(currentPlaceableObject))
+                if (ConstraintController.CanPlace(currentBC))
                 {
-                    string templateName = currentPlaceableBeyondComponent.template.name ;
+                    string templateName = currentBC.template.name ;
                     string name = templateName + "_" + (nbObjectsPlaced++) ;
 
                     // Place the first Ghost = still green, still not collidin'
-                    TemplateController.PlaceObject(ref currentPlaceableObject , name , BC_State.Ghost) ;
+                    TemplateController.PlaceObject(currentBC , name , BC_State.Ghost) ;
 
-                    draggedBC.Add(currentPlaceableBeyondComponent);
-                    draggingGroup = currentPlaceableBeyondComponent.beyondGroup ;
-                    lastGroupPosition = currentPlaceableBeyondComponent.groupPosition ;
+                    draggedBC.Add(currentBC);
+                    draggingGroup = currentBC.beyondGroup ;
+                    lastGroupPosition = currentBC.groupPosition ;
 
-                    currentPlaceableObject = null ;
+                    currentBC = null ;
+                    CreateNewPlaceableObject(templateName) ;
 
                     // Instantiate a big bunch of placeable object based on what we are currently dragging
-                    CreateNewPlaceableObject(templateName) ;
                     for (int i = 0; i < MaxDraggedObjectCount; i++)
                     {
                         BeyondComponent bc = TemplateController.CreateObject(templateName) ;
-                        GameObject go = bc.gameObject ;
                         //TODO Better names, please
                         name = templateName + "_Ghost" + i ;
-                        bc.setObjectGroup(draggingGroup , lastGroupPosition , currentPlaceableBeyondComponent.side) ;
-                        TemplateController.PlaceObject(ref go , name , BC_State.Ghost) ;
-                        go.SetActive(false) ;
+                        bc.setObjectGroup(draggingGroup , lastGroupPosition , currentBC.side) ;
+                        TemplateController.PlaceObject(bc , name , BC_State.Ghost) ;
+                        bc.gameObject.SetActive(false) ;
                         draggedBC.Add(bc);
                     }
                 }
@@ -264,7 +261,7 @@ namespace Beyond
 
                 // 1 - Calculate the current position in the group for  currentPlaceableObject
 
-                Vector3 objectPosition = currentPlaceableObject.transform.position - currentPlaceableBeyondComponent.template.pivotOffset ;
+                Vector3 objectPosition = currentBC.transform.position - currentBC.template.pivotOffset ;
                 objectPosition = RotateAroundPoint(objectPosition , draggingGroup.position , Quaternion.Inverse(draggingGroup.rotation)) ;
                 Vector3Int objectGroupPosition = Vector3Int.RoundToInt(objectPosition - draggingGroup.position);
 
@@ -289,9 +286,9 @@ namespace Beyond
                             {
                                 if (i++ < MaxDraggedObjectCount)
                                 {
-                                    draggedBC[i].setObjectGroup(draggingGroup, draggedBC[0].groupPosition + Vector3Int.left * j , currentPlaceableBeyondComponent.side);
-                                    draggedBC[i].transform.position = draggedBC[0].transform.position + p1 * j + currentPlaceableBeyondComponent.template.pivotOffset;
-                                    ConstraintController.SetCanPlaceObjectColour(draggedBC[i].gameObject);
+                                    draggedBC[i].setObjectGroup(draggingGroup, draggedBC[0].groupPosition + Vector3Int.left * j , currentBC.side);
+                                    draggedBC[i].transform.position = draggedBC[0].transform.position + p1 * j + currentBC.template.pivotOffset;
+                                    ConstraintController.SetCanPlaceObjectColour(draggedBC[i]);
                                     draggedBC[i].gameObject.SetActive(true);
                                 }
                             }
@@ -330,13 +327,13 @@ namespace Beyond
                                         Vector3Int currentPos = new Vector3Int( draggedBC[0].groupPosition.x + x * Xsign , 0 , draggedBC[0].groupPosition.z + z * Zsign ) ;
                                         if (i++<MaxDraggedObjectCount)
                                         {
-                                            draggedBC[i].setObjectGroup(draggingGroup , currentPos , currentPlaceableBeyondComponent.side) ;
+                                            draggedBC[i].setObjectGroup(draggingGroup , currentPos , currentBC.side) ;
                                             draggedBC[i].transform.position = draggingGroup.position + 
                                                 currentPos.x * draggingGroup.rightNormalised +
                                                 currentPos.y * draggingGroup.upNormalised +
                                                 currentPos.z * draggingGroup.forwardNormalised +
-                                                currentPlaceableBeyondComponent.template.pivotOffset ;
-                                            ConstraintController.SetCanPlaceObjectColour(draggedBC[i].gameObject) ;    
+                                                currentBC.template.pivotOffset ;
+                                            ConstraintController.SetCanPlaceObjectColour(draggedBC[i]) ;    
                                             draggedBC[i].gameObject.SetActive(true);
                                         }
                                     }
@@ -360,10 +357,10 @@ namespace Beyond
                 /*
                 Snap();
                 // If Snapping succeeded, place this object, add it to draggedObjects, create a new thinggy 
-                if (currentPlaceableBeyondComponent.beyondGroup!=null && ConstraintController.CanPlace(currentPlaceableObject))
+                if (currentBC.beyondGroup!=null && ConstraintController.CanPlace(currentPlaceableObject))
                 {
                     // TODO : this is where I should have logic to place walls in a line, other stuff in a surface, or even a friggin volume
-                    string templateName = currentPlaceableBeyondComponent.template.name ;
+                    string templateName = currentBC.template.name ;
                     string name = templateName + "_" + (nbObjectsPlaced++) ;
 
                     // Place the first Ghost = still green, still not collidin'
@@ -390,18 +387,17 @@ namespace Beyond
                 //TODO : dragging stuff - make it better
                 for (int i = 0; i < draggedBC.Count; i++)
                 {
-                    if (draggedBC[i].gameObject.activeSelf && ConstraintController.CanPlace(draggedBC[i].gameObject))
+                    if (draggedBC[i].gameObject.activeSelf && ConstraintController.CanPlace(draggedBC[i]))
                     {
-                        string name = currentPlaceableBeyondComponent.template.name + "_" + (nbObjectsPlaced++) ;
-                        GameObject go = draggedBC[i].gameObject ;
-                        TemplateController.PlaceObject(ref go , name) ;
+                        string name = currentBC.template.name + "_" + (nbObjectsPlaced++) ;
+                        TemplateController.PlaceObject(draggedBC[i] , name) ;
                     }
                     else
                     {
                         Destroy(draggedBC[i].gameObject);
                     }
                 }
-                Destroy(currentPlaceableObject);
+                Destroy(currentBC.gameObject);
                 draggingGroup = null ;
                 draggedBC.Clear();
                 /*
@@ -409,7 +405,7 @@ namespace Beyond
 
                 if (ConstraintController.CanPlace(currentPlaceableObject))
                 {
-                    string name = currentPlaceableBeyondComponent.template.name + "_" + (nbObjectsPlaced++) ;
+                    string name = currentBC.template.name + "_" + (nbObjectsPlaced++) ;
                     TemplateController.PlaceObject(ref currentPlaceableObject , name) ;
                 }
                 else
@@ -426,7 +422,7 @@ namespace Beyond
             if ((mouseWheelRotation  != Input.mouseScrollDelta.y) && !Input.GetKey(KeyCode.LeftControl))
             {
                 mouseWheelRotation = Input.mouseScrollDelta.y;
-                currentPlaceableObject.transform.Rotate(Vector3.up, mouseWheelRotation * 5f);
+                currentBC.transform.Rotate(Vector3.up, mouseWheelRotation * 5f);
                 return true;
             }
             return false;

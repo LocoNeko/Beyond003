@@ -59,6 +59,20 @@ namespace Beyond
         public void SetState(BC_State newState)
         {
             state = newState ;
+            if (state==BC_State.Ghost)
+            {
+                Color c = gameObject.GetComponent<Renderer>().material.color ;
+                c.a = 0.6f ;
+                gameObject.GetComponent<Renderer>().material.color = c ;
+            }
+            if (state==BC_State.Blueprint)
+            {
+                // Set the material back to the prefab's material to get rid of the green or red colours
+                gameObject.GetComponent<Renderer>().material = TemplateController.prefabMaterial(template);
+                Color c = gameObject.GetComponent<Renderer>().material.color ;
+                c.a = 1f ;
+                gameObject.GetComponent<Renderer>().material.color = c ;
+            }
         }
 
         public void setObjectGroup (BeyondGroup g , Vector3Int p , cellSide cs , bool firstObject=false)

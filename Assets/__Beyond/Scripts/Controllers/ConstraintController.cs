@@ -32,10 +32,8 @@ namespace Beyond
             return (layerMask == lm.value);
         }
 
-        public static bool CanPlace(GameObject go)
+        public static bool CanPlace(BeyondComponent bc)
         {
-            if (go == null) return false;
-            BeyondComponent bc = go.GetComponent<BeyondComponent>();
             if (bc==null) return false;
             if (bc.template.name=="Foundation")
             {
@@ -73,30 +71,26 @@ namespace Beyond
 
         //IMPORTANT : go.transform.position cannot be used since we're trying to place the GameObject through this method
         //rotation is fine (even if we just created the go, rotation will just be Quaternion.Identity)
-        public static Vector3 GetValidTerrainPointForObject(GameObject go , Vector3 pointOnTerrain)
+        public static Vector3 GetValidTerrainPointForObject(BeyondComponent bc , Vector3 pointOnTerrain)
         {
-            if (go == null) return pointOnTerrain;
-            BeyondComponent bc = go.GetComponent<BeyondComponent>();
             if (bc==null) return pointOnTerrain;
 
             // As a rule, the result is the same as the pointOnTerrain, we are just applying some filter below
             Vector3 result = pointOnTerrain ;
             
-            result = GetPointOnTerrain(go , pointOnTerrain) ;
+            result = GetPointOnTerrain(bc , pointOnTerrain) ;
             return result;
         }
 
         // given a point, get an object's postion above or below it so that the object is exactly on the Terrain
-        public static Vector3 GetPointOnTerrain(GameObject go , Vector3 point)
+        public static Vector3 GetPointOnTerrain(BeyondComponent bc , Vector3 point)
         {
-            Vector3 result = point ;
-
-            BeyondComponent bc = go.GetComponent<BeyondComponent>();
             if (bc==null) return point;
 
+            Vector3 result = point ;
             result.y = PlaceController.Instance.place.Height ; // Cast from the highest possible altitude
             RaycastHit hitInfo;
-            Physics.BoxCast(result, bc.template.castBox, Vector3.down, out hitInfo, go.transform.rotation , Mathf.Infinity, getTerrainMask()); //TODO - is this better ? : Physics.BoxCast(point, bc.template.castBox, Vector3.down, out hitInfo, go.transform.rotation);
+            Physics.BoxCast(result, bc.template.castBox, Vector3.down, out hitInfo, bc.transform.rotation , Mathf.Infinity, getTerrainMask()); //TODO - is this better ? : Physics.BoxCast(point, bc.template.castBox, Vector3.down, out hitInfo, go.transform.rotation);
             // Half the height of the object is bc.template.castBox.y
             //TODO : am I sure of that ? We need an offset for Foundations, by how much they can be insde terrain
             result.y = hitInfo.point.y + bc.template.castBox.y ;
@@ -189,10 +183,10 @@ namespace Beyond
             return group.BeyondComponentsAt(here).Exists(bc => bc.template.name == t_name && bc.side == cs) ;
         }
 
-        public static void SetCanPlaceObjectColour(GameObject g)
+        public static void SetCanPlaceObjectColour(BeyondComponent bc)
         {
-            Renderer r = g.GetComponent<Renderer>();
-            r.material.color = (ConstraintController.CanPlace(g) ? Color.green : Color.red);
+            Renderer r = bc.gameObject.GetComponent<Renderer>();
+            r.material.color = (ConstraintController.CanPlace(bc) ? Color.green : Color.red);
         }
 
         /*
