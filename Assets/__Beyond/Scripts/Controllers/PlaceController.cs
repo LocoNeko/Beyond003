@@ -52,8 +52,7 @@ namespace Beyond
             { // Auto give name
                 name = String.Format("Group {0:0000}",place.beyondGroups.Count);
             }
-            // bc.transform.position - bc.template.pivotOffset : THIS IS ESSENTIAL
-            // This allows us to properly set the pivot of the group 
+            // bc.transform.position - bc.template.pivotOffset : THIS IS ESSENTIAL - This allows us to properly set the pivot of the group 
             BeyondGroup group = new BeyondGroup(name , bc.transform.position - bc.template.pivotOffset , bc.transform.rotation);
             if (bc!=null)
             {

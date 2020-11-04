@@ -8,9 +8,19 @@ namespace Beyond
 
     public class FirstPersonMouseLook : MonoBehaviour
     {
+        public static FirstPersonMouseLook Instance { get; protected set; }
+
         public float mouseSensitivity = 100f;
         float xRotation = 0f;
 
+        void OnEnable()
+        {
+            if (Instance != null)
+            {
+                Debug.LogError("There should never be multiple FirstPersonMouseLook controllers");
+            }
+            Instance = this;
+        }
 
         // Update is called once per frame
         void Update()
@@ -26,5 +36,16 @@ namespace Beyond
                 transform.parent.Rotate(Vector3.up * mouseX);
             }
         }
+
+        public void Save(ref SavedGame game)
+        {
+            game.fplook_rotation = transform.rotation ;
+        }
+
+        public void Load(SavedGame game)
+        {
+            transform.rotation = game.fplook_rotation ;
+        }
+
     }
 }

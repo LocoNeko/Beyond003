@@ -264,3 +264,10 @@ paket-files/
 /Assets/__Beyond/Scenes
 /Assets/Resources/Prefab
 /Assets/Resources/Prefabs
+/Assets/TextMesh Pro
+/Builds
+/MapMagic.csproj
+/MapMagic.Editor.csproj
+/MapMagic.Settings.csproj
+/Tools.csproj
+/Tools.Editor.csproj

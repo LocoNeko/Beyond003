@@ -7,24 +7,28 @@ namespace Beyond
 {
     public class ElementPlacementController : MonoBehaviour
     {
-        public Terrain terrain;
-        public GameObject Fundation_prefab;
-
-        public LayerMask TerrainLayerMask;
-
-
-        [SerializeField]
         private KeyCode newFundationHotKey = KeyCode.U;
         private KeyCode newWallHotKey = KeyCode.I;
         private KeyCode newFloorHotKey = KeyCode.O;
         private KeyCode newWallholeHotKey = KeyCode.P;
         private GameObject currentPlaceableObject;
         private BeyondComponent currentPlaceableBeyondComponent;
+        List<BeyondComponent> draggedBC ;
         private float mouseWheelRotation;
-
         public float groupSnapTolerance = 0.5f;
         Vector3 mousePosition;
         int nbObjectsPlaced=0;
+        // TODO Dragging stuff: to sort out
+        public BeyondGroup draggingGroup ;
+        Vector3Int lastGroupPosition ;
+
+        int MaxDraggedObjectCount = 256;
+
+        public void Awake()
+        {
+            draggedBC = new List<BeyondComponent>() ;
+            draggingGroup = null;
+        }
 
         void Update()
         {
@@ -43,13 +47,14 @@ namespace Beyond
                     //}
 
                     // Make the placeable red or green based on whether it can be placed
-                    UIController.Instance.SetCanPlaceObjectColour(currentPlaceableObject) ;
+                    ConstraintController.SetCanPlaceObjectColour(currentPlaceableObject) ;
+                    Drag();
                     PlaceOnClic();
                 }
             }
             else if (currentPlaceableObject != null)
             { // Always destroy placeable object when we leave build mode
-                Destroy(currentPlaceableObject);
+                Destroy(currentPlaceableObject);  Debug.Log("Going off build mode destroyed placeable object");
                 currentPlaceableBeyondComponent = null;
             }
         }
@@ -62,7 +67,8 @@ namespace Beyond
             LayerMask layerMask = (ConstraintController.ShowOnTerrain(currentPlaceableBeyondComponent.template) ? ConstraintController.getTerrainMask() : ConstraintController.getBuildingsMask()) ;
             Vector3 position ;
 
-            if (Physics.Raycast(ray1, out hitInfo, UIController.Instance.forwardOffset , layerMask))
+            //TODO : 999f ? really ??
+            if (Physics.Raycast(ray1, out hitInfo, /*UIController.Instance.forwardOffset*/ 999f , layerMask))
             {
                 position = ConstraintController.GetValidTerrainPointForObject(currentPlaceableObject , hitInfo.point);
             }
@@ -85,7 +91,7 @@ namespace Beyond
             currentPlaceableObject.transform.position = p ;
               // TODO: clearly, the pivotOffset works well for Foundations average for Walls, badly for floors.
               // TODO: BECAUSE, I need a specific point per template to anchor the mouse to 
-            currentPlaceableObject.transform.position += currentPlaceableBeyondComponent.template.pivotOffset + Vector3.up*0.5f;
+            //currentPlaceableObject.transform.position += currentPlaceableBeyondComponent.template.pivotOffset ;
             if (r != null)
             {
                 currentPlaceableObject.transform.rotation = (Quaternion)r;
@@ -125,6 +131,8 @@ namespace Beyond
                 // Test to see if foundation is above groud like in GetValidPositionFromMouse
                 Vector3 point = ConstraintController.GetPointOnTerrain(currentPlaceableObject , currentPlaceableObject.transform.position) ;
                 float minY = point.y ;
+                //TODO: Hardcode for the time being as I tweak GetPointOnTerrain
+                minY=0;
 
                 if (snappedPosition.y>=minY)
                 { // Snap in place only if object's top is above ground
@@ -200,17 +208,205 @@ namespace Beyond
         {
             if (currentPlaceableObject == null)
             {
-                TemplateController.CreateObject(templateName , ref currentPlaceableObject , ref currentPlaceableBeyondComponent) ;
+                //TemplateController.CreateObject(templateName , ref currentPlaceableObject , ref currentPlaceableBeyondComponent) ;
+                // refactored into :
+                currentPlaceableBeyondComponent = TemplateController.CreateObject(templateName) ;
+                currentPlaceableObject = currentPlaceableBeyondComponent.gameObject ;
             }
             else
             {
-                Destroy(currentPlaceableObject);
+                Destroy(currentPlaceableObject);  Debug.Log("CreateNewPlaceableobject destroyed placeable object");
+            }
+        }
+
+        private void Drag()
+        {
+            // Start draggin (we have no draggedBC)
+            if (Input.GetMouseButtonDown(0) && draggedBC.Count==0)
+            {
+                if (ConstraintController.CanPlace(currentPlaceableObject))
+                {
+                    string templateName = currentPlaceableBeyondComponent.template.name ;
+                    string name = templateName + "_" + (nbObjectsPlaced++) ;
+
+                    // Place the first Ghost = still green, still not collidin'
+                    TemplateController.PlaceObject(ref currentPlaceableObject , name , BC_State.Ghost) ;
+
+                    draggedBC.Add(currentPlaceableBeyondComponent);
+                    draggingGroup = currentPlaceableBeyondComponent.beyondGroup ;
+                    lastGroupPosition = currentPlaceableBeyondComponent.groupPosition ;
+
+                    currentPlaceableObject = null ;
+
+                    // Instantiate a big bunch of placeable object based on what we are currently dragging
+                    CreateNewPlaceableObject(templateName) ;
+                    for (int i = 0; i < MaxDraggedObjectCount; i++)
+                    {
+                        BeyondComponent bc = TemplateController.CreateObject(templateName) ;
+                        GameObject go = bc.gameObject ;
+                        //TODO Better names, please
+                        name = templateName + "_Ghost" + i ;
+                        bc.setObjectGroup(draggingGroup , lastGroupPosition , currentPlaceableBeyondComponent.side) ;
+                        TemplateController.PlaceObject(ref go , name , BC_State.Ghost) ;
+                        go.SetActive(false) ;
+                        draggedBC.Add(bc);
+                    }
+                }
+            }
+
+
+            if (Input.GetMouseButton(0) && draggingGroup != null)
+            { // we are dragging AND we have an actual group we're dragging
+                /* Starting state :
+                - draggedObjects contains a list of objects currently displayed as being dragged
+                - currentPlaceableObject is the object we are dragging around
+                */ 
+
+                // 1 - Calculate the current position in the group for  currentPlaceableObject
+
+                Vector3 objectPosition = currentPlaceableObject.transform.position - currentPlaceableBeyondComponent.template.pivotOffset ;
+                objectPosition = RotateAroundPoint(objectPosition , draggingGroup.position , Quaternion.Inverse(draggingGroup.rotation)) ;
+                Vector3Int objectGroupPosition = Vector3Int.RoundToInt(objectPosition - draggingGroup.position);
+
+                if (objectGroupPosition != lastGroupPosition)
+                {
+                    Vector3 p1 ;
+                    Vector3 p2 ;
+                    int NbDimensions = draggedBC[0].DragDimensions(out p1 , out p2) ;
+                    if ( NbDimensions == 1)
+                    { // Dragging a line
+                        Vector3 dragTo = ClosestPointOnLine(p2 , p2+p1 , objectPosition) ;
+                        Debug.DrawLine(draggedBC[0].transform.position, dragTo, Color.red , 1f);
+                        objectGroupPosition = Vector3Int.RoundToInt(dragTo - draggingGroup.position);
+                        if (objectGroupPosition != lastGroupPosition)
+                        { // even after projecting on a line, are we still in a new cell ?
+                            //TODO : Best to move the current placeable object on that position, to keep it on a line
+                            lastGroupPosition = objectGroupPosition ;
+                            // The side decides which rotation we should use
+                            Vector3Int cellDiff = lastGroupPosition - draggedBC[0].groupPosition ;
+                            int i = 0;
+                            for (int j = 0; j < cellDiff.magnitude; j++)
+                            {
+                                if (i++ < MaxDraggedObjectCount)
+                                {
+                                    draggedBC[i].setObjectGroup(draggingGroup, draggedBC[0].groupPosition + Vector3Int.left * j , currentPlaceableBeyondComponent.side);
+                                    draggedBC[i].transform.position = draggedBC[0].transform.position + p1 * j + currentPlaceableBeyondComponent.template.pivotOffset;
+                                    ConstraintController.SetCanPlaceObjectColour(draggedBC[i].gameObject);
+                                    draggedBC[i].gameObject.SetActive(true);
+                                }
+                            }
+                            // Deactivate all ghosts that are not used in the area we are currently dragging
+                            if (i >= 0)
+                            {
+                                for (int j = i + 1; j <= MaxDraggedObjectCount; j++)
+                                {
+                                    draggedBC[j].gameObject.SetActive(false);
+                                }
+                            }
+                        }
+
+                    }
+                    if ( NbDimensions == 2)
+                    { // Dragging a plane
+                        
+                        Plane p = new Plane(p1 , p2) ;
+                        Vector3 dragTo = p.ClosestPointOnPlane(objectPosition) ;
+                        // Correct ObjectGroupPosition so we are in the plane we are dragging in 
+                        objectGroupPosition = Vector3Int.RoundToInt(dragTo - draggingGroup.position);
+
+                        if (objectGroupPosition != lastGroupPosition)
+                        { // even after projecting on a plane, are we still in a new cell ?
+                            lastGroupPosition = objectGroupPosition ;
+                            //Debug.Log("Dragging to a new position on a plane in the group: "+lastGroupPosition+" from draggedBC[0]: "+draggedBC[0].groupPosition);
+                            int Xsign = (lastGroupPosition.x >= draggedBC[0].groupPosition.x ? 1 : -1) ;
+                            int Zsign = (lastGroupPosition.z >= draggedBC[0].groupPosition.z ? 1 : -1) ;
+                            int i=0;
+                            for (int x=0 ; x<=Mathf.Abs(lastGroupPosition.x - draggedBC[0].groupPosition.x) ; x++)
+                            {
+                                for (int z=0 ; z<=Mathf.Abs(lastGroupPosition.z - draggedBC[0].groupPosition.z) ; z++)
+                                { // go from the origin of the drag to the current position
+                                    if (x!=0 || z!=0)
+                                    {
+                                        Vector3Int currentPos = new Vector3Int( draggedBC[0].groupPosition.x + x * Xsign , 0 , draggedBC[0].groupPosition.z + z * Zsign ) ;
+                                        if (i++<MaxDraggedObjectCount)
+                                        {
+                                            draggedBC[i].setObjectGroup(draggingGroup , currentPos , currentPlaceableBeyondComponent.side) ;
+                                            draggedBC[i].transform.position = draggingGroup.position + 
+                                                currentPos.x * draggingGroup.rightNormalised +
+                                                currentPos.y * draggingGroup.upNormalised +
+                                                currentPos.z * draggingGroup.forwardNormalised +
+                                                currentPlaceableBeyondComponent.template.pivotOffset ;
+                                            ConstraintController.SetCanPlaceObjectColour(draggedBC[i].gameObject) ;    
+                                            draggedBC[i].gameObject.SetActive(true);
+                                        }
+                                    }
+                                }
+                            }
+                            // Deactivate all ghosts that are not used in the area we are currently dragging
+                            if (i>=0)
+                            {
+                                for (int j = i+1; j <= MaxDraggedObjectCount; j++)
+                                {
+                                    draggedBC[j].gameObject.SetActive(false);
+                                }
+                            }
+                        }
+                    }
+                }
+
+
+
+
+                /*
+                Snap();
+                // If Snapping succeeded, place this object, add it to draggedObjects, create a new thinggy 
+                if (currentPlaceableBeyondComponent.beyondGroup!=null && ConstraintController.CanPlace(currentPlaceableObject))
+                {
+                    // TODO : this is where I should have logic to place walls in a line, other stuff in a surface, or even a friggin volume
+                    string templateName = currentPlaceableBeyondComponent.template.name ;
+                    string name = templateName + "_" + (nbObjectsPlaced++) ;
+
+                    // Place the first Ghost = still green, still not collidin'
+                    TemplateController.PlaceObject(ref currentPlaceableObject , name , BC_State.Ghost) ;
+
+                    // Put current ghost in the list of dragged objects
+                    draggedObjects.Add(currentPlaceableObject);
+                    currentPlaceableObject = null ;
+                    // Create a new placeable object that we are currently dragging
+                    CreateNewPlaceableObject(templateName) ;
+                }
+                */
+                // IF I already snapped, the current BC has a BeyondGroup set.
+
+                // TODO Get where we currently are compared to the last object in the dragged list
+                // If we are not in the same cell, put the current object in the dragged list and instantiate a new ghost object
+                // TODO : dragging back : we should be able to destroy ghosts we are placing over, except the last one
             }
         }
         private void PlaceOnClic()
         {
-            if (Input.GetMouseButtonDown(0))
+            if (Input.GetMouseButtonUp(0))
             {
+                //TODO : dragging stuff - make it better
+                for (int i = 0; i < draggedBC.Count; i++)
+                {
+                    if (draggedBC[i].gameObject.activeSelf && ConstraintController.CanPlace(draggedBC[i].gameObject))
+                    {
+                        string name = currentPlaceableBeyondComponent.template.name + "_" + (nbObjectsPlaced++) ;
+                        GameObject go = draggedBC[i].gameObject ;
+                        TemplateController.PlaceObject(ref go , name) ;
+                    }
+                    else
+                    {
+                        Destroy(draggedBC[i].gameObject);
+                    }
+                }
+                Destroy(currentPlaceableObject);
+                draggingGroup = null ;
+                draggedBC.Clear();
+                /*
+                This works for 1 clic :
+
                 if (ConstraintController.CanPlace(currentPlaceableObject))
                 {
                     string name = currentPlaceableBeyondComponent.template.name + "_" + (nbObjectsPlaced++) ;
@@ -221,6 +417,7 @@ namespace Beyond
                     //Debug.Log("Destroyed currentPlaceableObject "+ currentPlaceableObject .GetInstanceID()+ " as I couldn't place it");
                     Destroy(currentPlaceableObject);
                 }
+                */
             }
         }
 
@@ -239,6 +436,41 @@ namespace Beyond
         public static Vector3 RotateAroundPoint(Vector3 p , Vector3 pivot , Quaternion r)
         {
             return r * (p - pivot) + pivot ;
+        }
+
+        //TODO : use this when dragging, this will get me a point ont a line, which is useful for walls
+        public static Vector3 ClosestPointOnLine(Vector3 a, Vector3 b, Vector3 p)
+        {
+            return a + Vector3.Project(p - a, b - a);
+        }
+
+        // Just a debug thing
+        public void DrawPlane(Vector3 position, Vector3 normal) 
+        {
+
+            Vector3 v3;
+
+            if (normal.normalized != Vector3.forward)
+            v3 = Vector3.Cross(normal, Vector3.forward).normalized * normal.magnitude;
+            else
+            v3 = Vector3.Cross(normal, Vector3.up).normalized * normal.magnitude;;
+
+            v3*=5;
+
+            var corner0 = position + v3;
+            var corner2 = position - v3;
+            var q = Quaternion.AngleAxis(90f, normal);
+            v3 = q * v3;
+            var corner1 = position + v3;
+            var corner3 = position - v3;
+
+            Debug.DrawLine(corner0, corner2, Color.green , 1f);
+            Debug.DrawLine(corner1, corner3, Color.green , 1f);
+            Debug.DrawLine(corner0, corner1, Color.green , 1f);
+            Debug.DrawLine(corner1, corner2, Color.green , 1f);
+            Debug.DrawLine(corner2, corner3, Color.green , 1f);
+            Debug.DrawLine(corner3, corner0, Color.green , 1f);
+            Debug.DrawRay(position, normal, Color.red , 1f);
         }
 
     }

@@ -13,17 +13,23 @@ namespace Beyond
     // This script is attached to all objects specific to Beyond that can be created & placed
     public class BeyondComponent : MonoBehaviour
     {
+        [field: SerializeField]
         public Template template { get; protected set; }
         //TODO : Use this to determine what the parent object should collide with, snap with, etc
+        [field: SerializeField]
         public BC_State state { get; protected set; }
+        [field: SerializeField]
         public BeyondGroup beyondGroup { get; protected set; }
-        
+
         // Where is this component inside this cell ?
+        [field: SerializeField]
         public cellSide side { get; protected set; }
 
         // Where is this component's object in its group, compared to the group's root position
+        [field: SerializeField]
         public Vector3Int groupPosition { get; protected set; }
 
+        [field: SerializeField]
         public List<Vector3Int> cells { get; protected set; }
         public HashSet<GameObject> objectsTriggered { get; protected set; } // Objects this BO is colliding with
 
@@ -146,14 +152,7 @@ namespace Beyond
         public bool insideTerrain()
         {
             Collider[] collidersHit = Physics.OverlapBox(transform.position , template.castBox , transform.rotation , ConstraintController.getTerrainMask()) ;
-            /*
-            string debug_string="insideTerrain overlap boxes=";
-            foreach (Collider c in collidersHit)
-            {
-                debug_string += c.gameObject.name + ",";
-            }
-            Debug.Log(debug_string);
-            */
+            // string debug_string="insideTerrain overlap boxes="; foreach (Collider c in collidersHit) debug_string += c.gameObject.name + ","; Debug.Log(debug_string);
             return (collidersHit.Length >0);
         }
 
@@ -178,13 +177,40 @@ namespace Beyond
 
         void OnTriggerEnter(Collider c)
         {
-            Debug.Log("OnTriggerEnter: "+c.gameObject.name);
-            objectsTriggered.Add(c.gameObject);
+            objectsTriggered.Add(c.gameObject); //Debug.Log("OnTriggerEnter: "+c.gameObject.name);
         }
 
         void OnTriggerExit(Collider c)
         {
             objectsTriggered.Remove(c.gameObject);
+        }
+
+        public int DragDimensions(out Vector3 p1 , out Vector3 p2)
+        {
+            // if we are on a line, the side will give us the axis
+            // Line:  p1 is a normalised Vector in the axis of the line, p2 is the origin
+            // Plane: p1 is a normal vector, p2 is a point in the plane
+            if (template.dragDimensions==1)
+            { // drag along a line
+                // The line's axis must be rotated first by the group's rotation, second by the side's
+                //TODO : Make sure that no side rotation corresponds to going right
+                p1 = Vector3.Normalize(beyondGroup.rotation * sideRotation(side) * Vector3.right );
+                p2 = transform.position - template.pivotOffset ;
+                return 1 ;
+            }
+            if (template.dragDimensions==2)
+            { // drag along a plane
+                Vector3 forward = Vector3.Normalize(beyondGroup.rotation * sideRotation(side) * Vector3.forward) ;
+                Vector3 right   = Vector3.Normalize(beyondGroup.rotation * sideRotation(side) * Vector3.right) ;
+                p1 = Vector3.Cross(forward , right) ;
+                p2 = transform.position - template.pivotOffset ;
+                return 2 ;
+            }
+            // don't drag
+            Debug.Log("DragDimensions returned 0: no dragging");
+            p1 = Vector3.zero ;
+            p2 = Vector3.zero ;
+            return 0 ;
         }
     }
 

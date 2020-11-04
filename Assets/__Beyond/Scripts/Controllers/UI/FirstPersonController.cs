@@ -68,15 +68,15 @@ namespace Beyond
 
         public void Save(ref SavedGame game)
         {
-            game.fp_position = SavedGame.Vector3ToFloat(transform.position) ;
-            game.fp_rotation = SavedGame.QuaternionToFloat(transform.rotation) ;
+            game.fp_position = transform.position ;
+            game.fp_rotation = transform.rotation ;
         }
 
         public void Load(SavedGame game)
         {
             cc.enabled = false;
-            cc.transform.position = SavedGame.Vector3FromFloat(game.fp_position) ;
-            cc.transform.rotation = SavedGame.QuaternionFromFloat(game.fp_rotation) ;
+            cc.transform.position = game.fp_position ;
+            cc.transform.rotation = game.fp_rotation ;
             cc.enabled = true;
         }
 

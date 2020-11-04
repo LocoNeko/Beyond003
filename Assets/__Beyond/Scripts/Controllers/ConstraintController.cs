@@ -39,9 +39,10 @@ namespace Beyond
             if (bc==null) return false;
             if (bc.template.name=="Foundation")
             {
-                // 1 - Foundations must be partially inside terrain
+                // 1 - Foundations must be partially inside terrain, but their top must not be covered by it
                 //if (!BaseIsInTerrain(go.transform.position , bc.template.castBox , go.transform.rotation , heightOffset)) return false;
                 if (!BaseInTerrain(bc)) return false;
+                if (!TopClear(bc)) return false;
             }
             else
             {
@@ -62,9 +63,12 @@ namespace Beyond
         }
 
         // TODO : should this really be hardcoded this badly ? I might not need to even put that in the templates but just have a list somewhere
+        // OR: not even needed since all elemetns should be more or less above terrain ?
         public static bool ShowOnTerrain(Template t)
         {
-            return t.name == "Foundation" ;
+            //TODO : let' see if this is useful
+            //return t.name == "Foundation" ;
+            return true ;
         }
 
         //IMPORTANT : go.transform.position cannot be used since we're trying to place the GameObject through this method
@@ -78,11 +82,7 @@ namespace Beyond
             // As a rule, the result is the same as the pointOnTerrain, we are just applying some filter below
             Vector3 result = pointOnTerrain ;
             
-            if (bc.template.name=="Foundation")
-            {
-                result = GetPointOnTerrain(go , pointOnTerrain) ;
-            }
-            // If GO is not a foundation, it has to snap with something so we don't care about Terrain
+            result = GetPointOnTerrain(go , pointOnTerrain) ;
             return result;
         }
 
@@ -98,8 +98,10 @@ namespace Beyond
             RaycastHit hitInfo;
             Physics.BoxCast(result, bc.template.castBox, Vector3.down, out hitInfo, go.transform.rotation , Mathf.Infinity, getTerrainMask()); //TODO - is this better ? : Physics.BoxCast(point, bc.template.castBox, Vector3.down, out hitInfo, go.transform.rotation);
             // Half the height of the object is bc.template.castBox.y
-            result.y = hitInfo.point.y - bc.template.castBox.y;
-
+            //TODO : am I sure of that ? We need an offset for Foundations, by how much they can be insde terrain
+            result.y = hitInfo.point.y + bc.template.castBox.y ;
+            if (bc.template.name == "Foundation")
+                result.y += FoundationInTerrainBy - bc.template.castBox.y * 2; //FoundationInTerrainBy
             return result ;
         }
 
@@ -187,6 +189,18 @@ namespace Beyond
             return group.BeyondComponentsAt(here).Exists(bc => bc.template.name == t_name && bc.side == cs) ;
         }
 
+        public static void SetCanPlaceObjectColour(GameObject g)
+        {
+            Renderer r = g.GetComponent<Renderer>();
+            r.material.color = (ConstraintController.CanPlace(g) ? Color.green : Color.red);
+        }
+
+        /*
+        * ============================================================
+        * CONSTRAINTS CHECKING
+        * ============================================================
+        */
+
         public static bool CheckConstraints(BeyondComponent bc)
         {
             Constraints constraints = bc.template.constraints ;
@@ -232,7 +246,13 @@ namespace Beyond
 
         private static bool TopClear(BeyondComponent bc)
         {
-            throw new NotImplementedException();
+            Vector3 castFrom = bc.transform.position;
+            castFrom.y = PlaceController.Instance.place.Height; // Cast from the highest possible altitude
+            RaycastHit hitInfo;
+            float rayLength = PlaceController.Instance.place.Height - bc.transform.position.y - bc.template.castBox.y*2;
+            bool result = Physics.BoxCast(castFrom, bc.template.castBox, Vector3.down, out hitInfo, bc.transform.rotation, rayLength , getTerrainMask());
+            Debug.Log("TopClear = "+!result);
+            return !result;
         }
 
         // Is the bottom inside terrain by enough ?I also need to take the current heightOffset into accunt

@@ -15,8 +15,9 @@ namespace Beyond
         public List<Vector3Int> cells { get; protected set; }
         public GameObject prefab { get; protected set; }
         public Constraints constraints { get; protected set; }
+        public int dragDimensions { get; protected set; }
 
-        public Template(string name, Vector3 castBox , GameObject prefab_go , Constraints constraints , Vector3? pivotOffset=null , List<Vector3Int> cells=null)
+        public Template(string name, Vector3 castBox , GameObject prefab_go , Constraints constraints , int dragDimensions, Vector3? pivotOffset=null , List<Vector3Int> cells=null)
         {
             this.name = name;
             this.castBox = castBox;
@@ -30,6 +31,7 @@ namespace Beyond
             }
             this.prefab = prefab_go;
             this.constraints = constraints ;
+            this.dragDimensions = dragDimensions ;
 
             if (pivotOffset!=null)
             {

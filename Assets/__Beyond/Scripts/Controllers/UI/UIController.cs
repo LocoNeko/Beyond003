@@ -110,13 +110,6 @@ namespace Beyond
             closestGroup = g ;
         }
 
-        public void SetCanPlaceObjectColour(GameObject g)
-        {
-            Renderer r = g.GetComponent<Renderer>();
-            r.material.color = (ConstraintController.CanPlace(g) ? Color.green : Color.red);
-
-        }
-
         public void SaveGame() { SavedGame.Save() ; }
 
         public void LoadGame() { SavedGame.Load() ; }

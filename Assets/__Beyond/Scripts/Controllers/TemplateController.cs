@@ -26,7 +26,8 @@ namespace Beyond
                 castBox: new Vector3(0.5f, 0.55f, 0.5f) ,
                 prefab_go: Resources.Load<GameObject>("Prefabs/Foundation") ,
                 pivotOffset: new Vector3(0, -0.95f, 0f) ,
-                constraints: null
+                constraints: null ,
+                dragDimensions: 2
             ));
             templates.Add("Wall" , new Template(
                 name: "Wall" ,
@@ -34,7 +35,8 @@ namespace Beyond
                 prefab_go: Resources.Load<GameObject>("Prefabs/Wall") ,
                 pivotOffset: new Vector3(0f, 1.05f, -0.4f) ,
                 cells: new List<Vector3Int>() {new Vector3Int(0,0,0), new Vector3Int(0,1,0), new Vector3Int(0,2,0)},
-                constraints: null
+                constraints: null ,
+                dragDimensions: 1
             ));
             templates.Add("Wallhole" , new Template(
                 name: "Wallhole" ,
@@ -42,14 +44,16 @@ namespace Beyond
                 prefab_go: Resources.Load<GameObject>("Prefabs/Wallhole") ,
                 pivotOffset: new Vector3(0f, 1.25f, -0.4f) ,
                 cells: new List<Vector3Int>() {new Vector3Int(0,0,0), new Vector3Int(0,1,0), new Vector3Int(0,2,0)},
-                constraints: null
+                constraints: null ,
+                dragDimensions: 1
             ));
             templates.Add("Floor" , new Template(
                 name: "Floor" ,
                 castBox: new Vector3(0.5f, 0.05f, 0.5f) ,
                 prefab_go: Resources.Load<GameObject>("Prefabs/Floor") ,
                 pivotOffset: new Vector3(0, -0.45f, 0f) ,
-                constraints: null
+                constraints: null ,
+                dragDimensions: 2
             ));
             //TODO - Roof
             //TODO - WallOpened
@@ -68,25 +72,54 @@ namespace Beyond
             bc.setTemplate(template);
         }
 
-        public static void PlaceObject(ref GameObject go , string name)
+        //TODO : refactor my code to use this methid instead of the one above witrh refs
+        public static BeyondComponent CreateObject(string templateName)
+        {
+            Template template = TemplateController.Instance.templates[templateName];
+            GameObject go = Instantiate(template.prefab);
+            //TODO: Un-hardcode this shit
+            go.layer = 0 ;
+            //TODO : need to experiment with BoxColldier & trigger
+            go.GetComponent<BoxCollider>().enabled = true;
+            BeyondComponent bc = go.AddComponent<BeyondComponent>();
+            bc.setTemplate(template);
+            return bc ;
+        }
+
+        public static void PlaceObject(ref GameObject go , string name , BC_State state = BC_State.Blueprint)
         {
             BeyondComponent bc = go.GetComponent<BeyondComponent>() ;
-            // Set the material back to the prefab's material to get rid of the green or red colours
-            go.GetComponent<Renderer>().material = prefabMaterial(bc.template);
-            // TODO : Really need to think hard about this: will the box collider as trigger really be a general case for all elements ?
-            go.GetComponent<BoxCollider>().isTrigger = false;
-            go.GetComponent<BoxCollider>().enabled = true;
-            //TODO: Un-hardcode this shit
-            go.layer = 9 ;
-            bc.SetState(BC_State.Blueprint) ;
             go.name = name ;
+
             // if the object was not snapped to a group, create a new group
             if(bc.beyondGroup==null)
             {
                 PlaceController.Instance.CreateNewBeyondGroup(bc);
             }
-            go = null;
-            //TODO : If SHIFT is pressed, allow queuing of objects to be placed
+            // TODO : Really need to think hard about this: will the box collider as trigger really be a general case for all elements ?
+            go.GetComponent<BoxCollider>().isTrigger = false;
+            go.GetComponent<BoxCollider>().enabled = true;
+            //TODO: Un-hardcode this shit
+            go.layer = 9 ;
+            // TODO clean this once dragging is beautiful
+            if (state==BC_State.Blueprint)
+            {
+                // Set the material back to the prefab's material to get rid of the green or red colours
+                go.GetComponent<Renderer>().material = prefabMaterial(bc.template);
+                bc.SetState(BC_State.Blueprint) ;
+                go = null;
+            }
+            if (state==BC_State.Ghost)
+            { // When dragging, we place ghosts rather than blueprints
+                bc.SetState(BC_State.Ghost) ;
+            }
+        }
+
+        public static void GhostToBlueprint (GameObject go)
+        {
+            BeyondComponent bc = go.GetComponent<BeyondComponent>() ;
+            go.GetComponent<Renderer>().material = prefabMaterial(bc.template);
+            bc.SetState(BC_State.Blueprint) ;
         }
 
         public static Material prefabMaterial(Template t)
