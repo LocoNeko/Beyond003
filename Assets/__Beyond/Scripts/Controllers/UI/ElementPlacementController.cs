@@ -12,15 +12,14 @@ namespace Beyond
         private KeyCode newFloorHotKey = KeyCode.O;
         private KeyCode newWallholeHotKey = KeyCode.P;
         private BeyondComponent currentBC;
-        List<BeyondComponent> draggedBC ;
         private float mouseWheelRotation;
         public float groupSnapTolerance = 0.5f;
         Vector3 mousePosition;
         int nbObjectsPlaced=0;
         // TODO Dragging stuff: to sort out
+        List<BeyondComponent> draggedBC;
         public BeyondGroup draggingGroup ;
         Vector3Int lastGroupPosition ;
-
         int MaxDraggedObjectCount = 256;
 
         public void Awake()
@@ -63,13 +62,17 @@ namespace Beyond
             RaycastHit hitInfo;
 
             // filter the raycast based on whether this template should be shown on terrain or not
-            LayerMask layerMask = (ConstraintController.ShowOnTerrain(currentBC.template) ? ConstraintController.getTerrainMask() : ConstraintController.getBuildingsMask()) ;
+            //LayerMask layerMask = (ConstraintController.ShowOnTerrain(currentBC.template) ? ConstraintController.getTerrainMask() : ConstraintController.getBuildingsMask()) ;
             Vector3 position ;
 
             //TODO : 999f ? really ??
-            if (Physics.Raycast(ray1, out hitInfo, /*UIController.Instance.forwardOffset*/ 999f , layerMask))
+            if (Physics.Raycast(ray1, out hitInfo, /*UIController.Instance.forwardOffset*/ 999f, ConstraintController.getBuildingsMask()))
             {
-                position = ConstraintController.GetValidTerrainPointForObject(currentBC , hitInfo.point);
+                position = ConstraintController.PlaceGhost(currentBC, hitInfo.point, ConstraintController.getBuildingsMask());
+            }
+            else if (Physics.Raycast(ray1, out hitInfo, /*UIController.Instance.forwardOffset*/ 999f , ConstraintController.getTerrainMask()))
+            {
+                position = ConstraintController.PlaceGhost(currentBC , hitInfo.point, ConstraintController.getTerrainMask());
             }
             else
             { // If we don't hit terrain, just make the object float in front of us
@@ -80,21 +83,9 @@ namespace Beyond
             // If I'm in a group, I'm snapped, so only move if I'm a bit far from my current position
             if (currentBC.beyondGroup==null || Vector3.Distance(position , currentBC.transform.position) > groupSnapTolerance)
             {
-                MovePlaceableObject(position);
+                currentBC.MoveGhost(position);
             }
             Snap();
-        }
-
-        private void MovePlaceableObject(Vector3 p , Quaternion? r = null)
-        {
-            currentBC.transform.position = p ;
-              // TODO: clearly, the pivotOffset works well for Foundations average for Walls, badly for floors.
-              // TODO: BECAUSE, I need a specific point per template to anchor the mouse to 
-            //currentPlaceableObject.transform.position += currentBC.template.pivotOffset ;
-            if (r != null)
-            {
-                currentBC.transform.rotation = (Quaternion)r;
-            }
         }
 
         private void Snap()
@@ -114,24 +105,24 @@ namespace Beyond
                 Vector3 pointWithOffset = currentBC.transform.position - currentBC.template.pivotOffset;
                 
                 // 2 - calculate the difference between this point and the group's centre and apply the inverse rotation for the group so we can compare in a non-rotated way
-                pointWithOffset = RotateAroundPoint(pointWithOffset , closestGroup.position , Quaternion.Inverse(closestGroup.rotation));
+                pointWithOffset = Utility.RotateAroundPoint(pointWithOffset , closestGroup.position , Quaternion.Inverse(closestGroup.rotation));
 
                 // 3 - Obtain the equivalent Integer Vector3, which represents how many cells the object is from the group's centre
                 Vector3Int diffInt2 = Vector3Int.RoundToInt(pointWithOffset - closestGroup.position);
                 UIController.Instance.positionInGroup = diffInt2;
 
                 // 4 - This is the position of the centre of the cell
-                Vector3 snappedPosition = closestGroup.position + (Vector3)diffInt2; //FIXME + currentBC.template.pivotOffset;
+                Vector3 snappedPosition = closestGroup.position + (Vector3)diffInt2;
 
                 // 5 - Rotate it by the group's rotation for final result
-                snappedPosition = RotateAroundPoint(snappedPosition , closestGroup.position , closestGroup.rotation) ;
+                snappedPosition = Utility.RotateAroundPoint(snappedPosition , closestGroup.position , closestGroup.rotation) ;
 
                 // TODO : move this constraint to ConstraintController
                 // Test to see if foundation is above groud like in GetValidPositionFromMouse
-                Vector3 point = ConstraintController.GetPointOnTerrain(currentBC , currentBC.transform.position) ;
+                Vector3 point = ConstraintController.GetPointOnLayer(currentBC , currentBC.transform.position , ConstraintController.getTerrainMask()) ;
                 float minY = point.y ;
-                //TODO: Hardcode for the time being as I tweak GetPointOnTerrain
-                minY=0;
+                //TODO: Hardcode for the time being as I tweak GetPointOnLayer
+                minY = 0;
 
                 if (snappedPosition.y>=minY)
                 { // Snap in place only if object's top is above ground
@@ -236,6 +227,8 @@ namespace Beyond
 
                     currentBC = null ;
                     CreateNewPlaceableObject(templateName) ;
+                    // TODO : another hardcoded position. Not good. Yet, I must move the currentBC to where I started dragging or else I'm going to drag to some unknown place.
+                    currentBC.transform.position = draggedBC[0].transform.position;
 
                     // Instantiate a big bunch of placeable object based on what we are currently dragging
                     for (int i = 0; i < MaxDraggedObjectCount; i++)
@@ -262,7 +255,7 @@ namespace Beyond
                 // 1 - Calculate the current position in the group for  currentPlaceableObject
 
                 Vector3 objectPosition = currentBC.transform.position - currentBC.template.pivotOffset ;
-                objectPosition = RotateAroundPoint(objectPosition , draggingGroup.position , Quaternion.Inverse(draggingGroup.rotation)) ;
+                objectPosition = Utility.RotateAroundPoint(objectPosition , draggingGroup.position , Quaternion.Inverse(draggingGroup.rotation)) ;
                 Vector3Int objectGroupPosition = Vector3Int.RoundToInt(objectPosition - draggingGroup.position);
 
                 if (objectGroupPosition != lastGroupPosition)
@@ -270,9 +263,10 @@ namespace Beyond
                     Vector3 p1 ;
                     Vector3 p2 ;
                     int NbDimensions = draggedBC[0].DragDimensions(out p1 , out p2) ;
+
                     if ( NbDimensions == 1)
                     { // Dragging a line
-                        Vector3 dragTo = ClosestPointOnLine(p2 , p2+p1 , objectPosition) ;
+                        Vector3 dragTo = Utility.ClosestPointOnLine(p2 , p2+p1 , objectPosition) ;
                         Debug.DrawLine(draggedBC[0].transform.position, dragTo, Color.red , 1f);
                         objectGroupPosition = Vector3Int.RoundToInt(dragTo - draggingGroup.position);
                         if (objectGroupPosition != lastGroupPosition)
@@ -303,6 +297,7 @@ namespace Beyond
                         }
 
                     }
+
                     if ( NbDimensions == 2)
                     { // Dragging a plane
                         
@@ -427,47 +422,5 @@ namespace Beyond
             }
             return false;
         }
-
-        //TODO : I should really place those into another class, specifically for that type of manipulation
-        public static Vector3 RotateAroundPoint(Vector3 p , Vector3 pivot , Quaternion r)
-        {
-            return r * (p - pivot) + pivot ;
-        }
-
-        //TODO : use this when dragging, this will get me a point ont a line, which is useful for walls
-        public static Vector3 ClosestPointOnLine(Vector3 a, Vector3 b, Vector3 p)
-        {
-            return a + Vector3.Project(p - a, b - a);
-        }
-
-        // Just a debug thing
-        public void DrawPlane(Vector3 position, Vector3 normal) 
-        {
-
-            Vector3 v3;
-
-            if (normal.normalized != Vector3.forward)
-            v3 = Vector3.Cross(normal, Vector3.forward).normalized * normal.magnitude;
-            else
-            v3 = Vector3.Cross(normal, Vector3.up).normalized * normal.magnitude;;
-
-            v3*=5;
-
-            var corner0 = position + v3;
-            var corner2 = position - v3;
-            var q = Quaternion.AngleAxis(90f, normal);
-            v3 = q * v3;
-            var corner1 = position + v3;
-            var corner3 = position - v3;
-
-            Debug.DrawLine(corner0, corner2, Color.green , 1f);
-            Debug.DrawLine(corner1, corner3, Color.green , 1f);
-            Debug.DrawLine(corner0, corner1, Color.green , 1f);
-            Debug.DrawLine(corner1, corner2, Color.green , 1f);
-            Debug.DrawLine(corner2, corner3, Color.green , 1f);
-            Debug.DrawLine(corner3, corner0, Color.green , 1f);
-            Debug.DrawRay(position, normal, Color.red , 1f);
-        }
-
     }
 }

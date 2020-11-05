@@ -59,22 +59,6 @@ namespace Beyond
             //TODO - WallOpened
         }
 
-
-        /*
-        public static void CreateObject(string templateName , ref GameObject go , ref BeyondComponent bc)
-        {
-            Template template = TemplateController.Instance.templates[templateName];
-            go = Instantiate(template.prefab);
-            //TODO: Un-hardcode this shit
-            go.layer = 0 ;
-            //TODO : need to experiment with BoxColldier & trigger
-            go.GetComponent<BoxCollider>().enabled = true;
-            bc = go.AddComponent<BeyondComponent>();
-            bc.setTemplate(template);
-        }
-        */
-
-        //TODO : refactor my code to use this methid instead of the one above witrh refs
         public static BeyondComponent CreateObject(string templateName)
         {
             Template template = TemplateController.Instance.templates[templateName];
@@ -98,7 +82,7 @@ namespace Beyond
                 PlaceController.Instance.CreateNewBeyondGroup(bc);
             }
             // TODO : Really need to think hard about this: will the box collider as trigger really be a general case for all elements ?
-            bc.gameObject.GetComponent<BoxCollider>().isTrigger = false;
+            bc.gameObject.GetComponent<BoxCollider>().isTrigger = true;
             bc.gameObject.GetComponent<BoxCollider>().enabled = true;
             //TODO: Un-hardcode this shit
             bc.gameObject.layer = 9 ;

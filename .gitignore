@@ -271,3 +271,7 @@ paket-files/
 /MapMagic.Settings.csproj
 /Tools.csproj
 /Tools.Editor.csproj
+
+Assembly-CSharp-Editor.csproj
+Assembly-CSharp.csproj
+Beyond003.sln

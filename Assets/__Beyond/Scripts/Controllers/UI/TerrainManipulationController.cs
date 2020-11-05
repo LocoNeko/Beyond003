@@ -8,6 +8,7 @@ namespace Beyond
     {
         public GameObject testObject;
         public GameObject spherePrefab;
+        public GameObject TerrainObject;
 
         public Terrain terrain;
         public GameObject selectionTerrain_prefab;
@@ -31,6 +32,36 @@ namespace Beyond
             spheres = new List<GameObject>();
             terrainPoints = new HashSet<Vector2Int>();
 
+            // Adding tree colliders to a Tree layer
+            TreeInstance[] trees = terrainData.treeInstances;
+            int i = 0;
+            foreach (TreeInstance aTree in trees)
+            {
+                //Debug.Log("Found a tree at " + Vector3.Scale(aTree.position , terrainData.size));
+                GameObject TreePrefab = terrainData.treePrototypes[aTree.prototypeIndex].prefab;
+
+                // Create an empty GameObject where the tree is
+                GameObject go = new GameObject();
+                go.name = "Tree_" + (i++);
+                go.transform.SetParent(TerrainObject.transform);
+                go.transform.position = Vector3.Scale(aTree.position, terrainData.size);
+                go.layer = 11;
+
+                // Copy the tree prototype's CapsuleCollider onto a new collider for this tree
+                CapsuleCollider cc = TreePrefab.GetComponentInChildren<CapsuleCollider>();
+
+                // Move and rotate my empty GameObject to that of the tree prefab's
+                GameObject TreePrefabColliderParent = cc.gameObject;
+                go.transform.position += TreePrefabColliderParent.transform.position;
+                go.transform.rotation = TreePrefabColliderParent.transform.rotation;
+
+                // Copy the collider
+                CapsuleCollider cc2 = go.AddComponent<CapsuleCollider>();
+                cc2.direction = cc.direction;
+                cc2.radius = cc.radius;
+                cc2.height = cc.height;
+                cc2.center = cc.center;
+            }
         }
 
         // Update is called once per frame

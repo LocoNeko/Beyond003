@@ -21,6 +21,11 @@ namespace Beyond
             return getMask("Ground");
         }
 
+        public static LayerMask getTreesMask()
+        {
+            return getMask("Trees");
+        }
+
         public static LayerMask getBuildingsMask()
         {
             return getMask("Buildings");
@@ -35,17 +40,24 @@ namespace Beyond
         public static bool CanPlace(BeyondComponent bc)
         {
             if (bc==null) return false;
+            if (bc.collidingWithTree())
+            {
+                Debug.Log(bc.gameObject.name+ " Colliding with tree");
+                return false;
+            }
             if (bc.template.name=="Foundation")
             {
                 // 1 - Foundations must be partially inside terrain, but their top must not be covered by it
                 //if (!BaseIsInTerrain(go.transform.position , bc.template.castBox , go.transform.rotation , heightOffset)) return false;
                 if (!BaseInTerrain(bc)) return false;
                 if (!TopClear(bc)) return false;
+                if (IsTemplatePresentHere(bc.beyondGroup, bc.groupPosition, bc.template.name)) return false; // can't already have a foundation
             }
             else
             {
                 // 2 -All non-foundations objects must be above terrain - return false immediately if they're not
                 if(bc.insideTerrain()) return false ;
+                if (IsTemplatePresentHere(bc.beyondGroup, bc.groupPosition, bc.template.name , bc.side)) return false; // can't already have a the same object at the same place & position
             }
 
             //3 - All non-foundations must be snapped to another building part
@@ -62,35 +74,35 @@ namespace Beyond
 
         // TODO : should this really be hardcoded this badly ? I might not need to even put that in the templates but just have a list somewhere
         // OR: not even needed since all elemetns should be more or less above terrain ?
+        /*
         public static bool ShowOnTerrain(Template t)
         {
-            //TODO : let' see if this is useful
-            //return t.name == "Foundation" ;
-            return true ;
+            return t.name == "Foundation" ;
         }
+        */
 
         //IMPORTANT : go.transform.position cannot be used since we're trying to place the GameObject through this method
         //rotation is fine (even if we just created the go, rotation will just be Quaternion.Identity)
-        public static Vector3 GetValidTerrainPointForObject(BeyondComponent bc , Vector3 pointOnTerrain)
+        public static Vector3 PlaceGhost(BeyondComponent bc , Vector3 pointOnTerrain , LayerMask layerMask)
         {
             if (bc==null) return pointOnTerrain;
 
             // As a rule, the result is the same as the pointOnTerrain, we are just applying some filter below
             Vector3 result = pointOnTerrain ;
             
-            result = GetPointOnTerrain(bc , pointOnTerrain) ;
+            result = GetPointOnLayer(bc , pointOnTerrain , layerMask) ;
             return result;
         }
 
         // given a point, get an object's postion above or below it so that the object is exactly on the Terrain
-        public static Vector3 GetPointOnTerrain(BeyondComponent bc , Vector3 point)
+        public static Vector3 GetPointOnLayer(BeyondComponent bc , Vector3 point , LayerMask layerMask)
         {
             if (bc==null) return point;
 
             Vector3 result = point ;
             result.y = PlaceController.Instance.place.Height ; // Cast from the highest possible altitude
             RaycastHit hitInfo;
-            Physics.BoxCast(result, bc.template.castBox, Vector3.down, out hitInfo, bc.transform.rotation , Mathf.Infinity, getTerrainMask()); //TODO - is this better ? : Physics.BoxCast(point, bc.template.castBox, Vector3.down, out hitInfo, go.transform.rotation);
+            Physics.BoxCast(result, bc.template.castBox, Vector3.down, out hitInfo, bc.transform.rotation , Mathf.Infinity, layerMask); //TODO - is this better ? : Physics.BoxCast(point, bc.template.castBox, Vector3.down, out hitInfo, go.transform.rotation);
             // Half the height of the object is bc.template.castBox.y
             //TODO : am I sure of that ? We need an offset for Foundations, by how much they can be insde terrain
             result.y = hitInfo.point.y + bc.template.castBox.y ;
@@ -121,6 +133,7 @@ namespace Beyond
                 {
                     sts=cellSide.Left;
                 }
+                if (IsTemplatePresentHere(group, here, t.name, sts)) return false; // Can't have wall in the same position and side
 
                 // There must be a foundation to place a Wall
                 if (IsTemplatePresentHere(group , here, "Foundation")) 
@@ -140,6 +153,7 @@ namespace Beyond
                 {
                     sts=cellSide.Left;
                 }
+                if (IsTemplatePresentHere(group, here, t.name, sts)) return false; // Can't have wallhole in the same position and side
 
                 // There must be a foundation to place a Wall
                 if (IsTemplatePresentHere(group , here, "Foundation")) 
@@ -175,12 +189,14 @@ namespace Beyond
 
         public static bool IsTemplatePresentHere(BeyondGroup group , Vector3Int here , string t_name)
         {
-            return group.BeyondComponentsAt(here).Exists(bc => bc.template.name == t_name) ;
+            if (group == null) return false;
+            return group.BeyondComponentsAt(here).Exists(bc => bc.template.name == t_name && bc.state!=BC_State.Ghost) ;
         }
 
         public static bool IsTemplatePresentHere(BeyondGroup group , Vector3Int here , string t_name , cellSide cs)
         {
-            return group.BeyondComponentsAt(here).Exists(bc => bc.template.name == t_name && bc.side == cs) ;
+            if (group == null) return false;
+            return group.BeyondComponentsAt(here).Exists(bc => bc.template.name == t_name && bc.side == cs && bc.state != BC_State.Ghost) ;
         }
 
         public static void SetCanPlaceObjectColour(BeyondComponent bc)
@@ -245,7 +261,8 @@ namespace Beyond
             RaycastHit hitInfo;
             float rayLength = PlaceController.Instance.place.Height - bc.transform.position.y - bc.template.castBox.y*2;
             bool result = Physics.BoxCast(castFrom, bc.template.castBox, Vector3.down, out hitInfo, bc.transform.rotation, rayLength , getTerrainMask());
-            Debug.Log("TopClear = "+!result);
+            if (result) 
+                Debug.Log(bc.gameObject.name+" top is not clear");
             return !result;
         }
 
@@ -266,7 +283,7 @@ namespace Beyond
                 for (float j = -1; j <= 2; j+=2)
                 {
                     Vector3 point = (p + new Vector3((BoxCast.x - FoundationInTerrainBy/2) * i , - BoxCast.y + FoundationInTerrainBy/2 + YOffset , (BoxCast.z - FoundationInTerrainBy/2) * j ))  ;
-                    point = ElementPlacementController.RotateAroundPoint(point , p , q) ;
+                    point = Utility.RotateAroundPoint(point , p , q) ;
                     /*
                     The line above should be equivalent to the 3 lines below
                     Vector3 direction = point - p ; // In order to apply the rotation, we need to find a vector from p to this new point

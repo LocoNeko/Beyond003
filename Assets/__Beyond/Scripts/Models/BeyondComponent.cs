@@ -56,14 +56,39 @@ namespace Beyond
             template = t;
         }
 
+        /// <summary>
+        /// If this BC is a Ghost, move it to this position
+        /// </summary>
+        public void MoveGhost(Vector3 p, Quaternion? r = null)
+        {
+            if (state == BC_State.Ghost)
+            {
+                transform.position = p;
+                if (r != null)
+                {
+                    transform.rotation = (Quaternion)r;
+                }
+            }
+        }
+
         public void SetState(BC_State newState)
         {
             state = newState ;
             if (state==BC_State.Ghost)
             {
                 Color c = gameObject.GetComponent<Renderer>().material.color ;
-                c.a = 0.6f ;
-                gameObject.GetComponent<Renderer>().material.color = c ;
+                Color c2 = new Color(c.r, c.g, c.b, 0.6f);
+                gameObject.GetComponent<Renderer>().material.SetColor("_Color", c2) ;
+                /*
+                 * TODO : This is ugly. How can I get just a little bit of transparency
+                Material mat = new Material(Shader.Find("Standard"));
+                mat.SetColor("_Color", new Color(1, 0, 0, .5f));
+                mat.SetFloat("_Mode", 3);
+                mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                mat.EnableKeyword("_ALPHABLEND_ON");
+                mat.renderQueue = 3000;
+                */
             }
             if (state==BC_State.Blueprint)
             {
@@ -187,6 +212,12 @@ namespace Beyond
             }
             //Debug.Log("collidingWithBuilding FALSE");
             return false;
+        }
+
+        public bool collidingWithTree()
+        {
+            Collider[] hitTreeColliders = Physics.OverlapBox(transform.position, template.castBox, transform.rotation, ConstraintController.getTreesMask());
+            return (hitTreeColliders.Length > 0) ;
         }
 
         void OnTriggerEnter(Collider c)

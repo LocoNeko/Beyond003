@@ -24,9 +24,9 @@ namespace Beyond
             rotation = r ;
             name = s;
             componentList = new List<BeyondComponent>();
-            rightNormalised = ElementPlacementController.RotateAroundPoint(Vector3.right , Vector3.zero , r) ;
-            forwardNormalised = ElementPlacementController.RotateAroundPoint(Vector3.forward , Vector3.zero , r) ;
-            upNormalised = ElementPlacementController.RotateAroundPoint(Vector3.up , Vector3.zero , r) ;
+            rightNormalised = Utility.RotateAroundPoint(Vector3.right , Vector3.zero , r) ;
+            forwardNormalised = Utility.RotateAroundPoint(Vector3.forward , Vector3.zero , r) ;
+            upNormalised = Utility.RotateAroundPoint(Vector3.up , Vector3.zero , r) ;
             CreateGroupObject();
         }
 
