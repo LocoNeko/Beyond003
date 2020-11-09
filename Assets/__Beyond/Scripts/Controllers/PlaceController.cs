@@ -59,7 +59,7 @@ namespace Beyond
                 group.addBeyondComponent(bc);
                 // Vector3Int.zero because the first object in a group is at position [0,0,0]
                 // TODO: cellSide.Down because the first object is always a foundation, but I shouldn't hardcode
-                bc.setObjectGroup(group , Vector3Int.zero , cellSide.Down , true);
+                bc.SetBCinGroup(group , Vector3Int.zero , cellSide.Down , true);
             }
             place.beyondGroups.Add(group);
         }

@@ -100,6 +100,10 @@ namespace Beyond
             }
         }
 
+        /*
+        Sets the group of this BC, its position in the gorup, and places the object where it must be
+        */
+        /*
         public void setObjectGroup (BeyondGroup g , Vector3Int p , cellSide cs , bool firstObject=false)
         { // TODO should make that more robust : what if g is null ?
             unsetObjectGroup();
@@ -120,6 +124,33 @@ namespace Beyond
                     // Move the object to its template offset position
                     transform.position += rotatedPivotOffset;
 
+                    // Rotate the object by the group's rotation + its cellSide rotation
+                    transform.rotation = g.rotation * sideRotation(cs) ;
+                }
+                g.addBeyondComponent(this);
+            }
+        }
+        */
+
+        //TODO: this should replace setObjectGroup and move the transform where it should be
+        public void SetBCinGroup (BeyondGroup g , Vector3Int p , cellSide cs , bool firstObject=false)
+        { // TODO should make that more robust : what if g is null ?
+            unsetObjectGroup();
+            if (g!=null)
+            {
+                beyondGroup = g ;
+                groupPosition = p ;
+                side = cs ;
+                // The first object should not be offset or rotated by the group, since it sets the group position and rotation 
+                if (!firstObject)
+                {
+                    // Rotate the cell's position to apply the group's rotation
+                    Vector3 rotatedCellPosition = Utility.RotateAroundPoint(p , Vector3.zero , g.rotation) ;
+                    // Rotate the pivot's position to apply the group's rotation and the side's rotation 
+                    Vector3 rotatedPivotOffset = Utility.RotateAroundPoint(template.pivotOffset, Vector3.zero , sideRotation(cs) * g.rotation) ;
+                    Vector3 ObjectPosition = g.position + rotatedCellPosition + rotatedPivotOffset ;
+
+                    transform.position = ObjectPosition ;
                     // Rotate the object by the group's rotation + its cellSide rotation
                     transform.rotation = g.rotation * sideRotation(cs) ;
                 }
@@ -177,6 +208,18 @@ namespace Beyond
                 result = cellSide.Down;
             }
             return result ;
+        }
+
+        public static cellSide getSideByRotation(Quaternion r)
+        {
+            float angle = Quaternion.Angle(Quaternion.identity , r) ;
+            if (angle>45f && angle<=135f)
+                return cellSide.Right ;
+            if (angle>135f && angle<=225f)
+                return cellSide.Front ;
+            if (angle>225f && angle<=315f)
+                return cellSide.Left ;
+            return cellSide.Back ;
         }
 
         public void unsetObjectGroup()
