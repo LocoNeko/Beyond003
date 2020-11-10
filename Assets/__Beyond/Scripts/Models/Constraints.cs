@@ -14,7 +14,6 @@ namespace Beyond
         public List<Vector3Int> offsetsList {get; protected set;}
         public List<int> cellSides {get; protected set;}
         public float depth {get; protected set;}
-
         public LayerMask mask { get; protected set; }
 
         public Constraints()

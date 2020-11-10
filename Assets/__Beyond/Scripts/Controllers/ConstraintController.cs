@@ -52,7 +52,6 @@ namespace Beyond
             if (bc.template.name=="Foundation")
             {
                 // 1 - Foundations must be partially inside terrain, but their top must not be covered by it
-                //if (!BaseIsInTerrain(go.transform.position , bc.template.castBox , go.transform.rotation , heightOffset)) return false;
                 if (!BaseInTerrain(bc)) return false;
                 if (!TopClear(bc)) return false;
                 if (IsTemplatePresentHere(bc.beyondGroup, bc.groupPosition, bc.template.name)) return false; // can't already have a foundation
@@ -278,21 +277,18 @@ namespace Beyond
             Vector3 p = bc.transform.gameObject.transform.position ;
             Quaternion q = bc.transform.gameObject.transform.rotation ;
             
-            // TODO : get this from the UI Controller, set it in the ElementPlacementController
-            float YOffset = 0.0f;
-
             // Cast 4 boxes at each corner of the bottom of the object
             // Their centres are: p + BoxCast in both X and Z, plus FoundationInTerrainBy / 2
             for (float i = -1; i <= 2; i+=2)
             {
                 for (float j = -1; j <= 2; j+=2)
                 {
-                    Vector3 point = (p + new Vector3((BoxCast.x - FoundationInTerrainBy/2) * i , - BoxCast.y + FoundationInTerrainBy/2 + YOffset , (BoxCast.z - FoundationInTerrainBy/2) * j ))  ;
+                    Vector3 point = (p + new Vector3((BoxCast.x - FoundationInTerrainBy/2) * i , - BoxCast.y + FoundationInTerrainBy/2 , (BoxCast.z - FoundationInTerrainBy/2) * j ))  ;
                     point = Utility.RotateAroundPoint(point , p , q) ;
 
                     //Debug.DrawLine(point + (Vector3.down * YOffset), new Vector3(point.x , point.y- FoundationInTerrainBy/2 , point.z) , Color.yellow , 0.25f);
-                    // The height of the boxes' starting point must be offset by their height (BoxCast.y) and YOffset
-                    if (Physics.BoxCast(point - (Vector3.down * (BoxCast.y - YOffset)), BoxCast, Vector3.down, q, Mathf.Infinity , getTerrainMask()))
+                    // The height of the boxes' starting point must be offset by the template's half height (BoxCast.y)
+                    if (Physics.BoxCast(point - (Vector3.down * BoxCast.y), BoxCast, Vector3.down, q, Mathf.Infinity , getTerrainMask()))
                     {
                         return false ;
                     }
