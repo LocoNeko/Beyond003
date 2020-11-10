@@ -87,14 +87,14 @@ namespace Beyond
 
         //IMPORTANT : go.transform.position cannot be used since we're trying to place the GameObject through this method
         //rotation is fine (even if we just created the go, rotation will just be Quaternion.Identity)
-        public static Vector3 PlaceGhost(BeyondComponent bc , Vector3 pointOnTerrain , LayerMask layerMask)
+        public static Vector3 PlaceGhost(BeyondComponent bc , Vector3 onPoint , LayerMask layerMask)
         {
-            if (bc==null) return pointOnTerrain;
+            if (bc==null) return onPoint;
 
             // As a rule, the result is the same as the pointOnTerrain, we are just applying some filter below
-            Vector3 result = pointOnTerrain ;
+            Vector3 result = onPoint ;
             
-            result = GetPointOnLayer(bc , pointOnTerrain , layerMask) ;
+            result = GetPointOnLayer(bc , onPoint , layerMask) ;
             return result;
         }
 
@@ -115,7 +115,7 @@ namespace Beyond
             return result ;
         }
 
-        public static bool CanSnapToGroupHere(BeyondGroup group , Vector3Int here , Template t , Vector3 dFromPivot , out cellSide sts)
+        public static bool CanSnapToGroupHere(BeyondGroup group , Vector3Int here , Template t , Vector3 dFromPivot , Quaternion rotation , out cellSide sts)
         {
             if (t.name=="Foundation")
             {
@@ -132,43 +132,43 @@ namespace Beyond
             }
             if (t.name=="Wall")
             {
+                //TODO : basically, closestSide is a terrible idea. Just use the object's rotation to find which side it should be 
+
+                /*
                 sts = BeyondComponent.closestSide(dFromPivot) ;
                 if (sts==cellSide.Up || sts==cellSide.Down)
                 {
                     sts=cellSide.Left;
                 }
+                */
+                sts = BeyondComponent.getSideByRotation(rotation) ;
                 if (IsTemplatePresentHere(group, here, t.name, sts)) return false; // Can't have wall in the same position and side
 
                 // There must be a foundation to place a Wall
                 if (IsTemplatePresentHere(group , here, "Foundation")) 
                 {
-                    // Can't place a wall if there's already one in the same cell and the same side
-                    if (IsTemplatePresentHere(group , here, "Wall" , sts))
-                    {
-                        return false ;
-                    } 
                     return true ; 
                 }
+                return false;
             }
             if (t.name=="Wallhole")
             {
+                /*
                 sts = BeyondComponent.closestSide(dFromPivot) ;
                 if (sts==cellSide.Up || sts==cellSide.Down)
                 {
                     sts=cellSide.Left;
                 }
+                */
+                sts = BeyondComponent.getSideByRotation(rotation) ;
                 if (IsTemplatePresentHere(group, here, t.name, sts)) return false; // Can't have wallhole in the same position and side
 
                 // There must be a foundation to place a Wall
                 if (IsTemplatePresentHere(group , here, "Foundation")) 
                 {
-                    // Can't place a wall if there's already one in the same cell and the same side
-                    if (IsTemplatePresentHere(group , here, "Wall" , sts))
-                    {
-                        return false ;
-                    } 
                     return true ; 
                 }
+                return false ;
             }
             if (t.name=="Floor")
             {
@@ -186,6 +186,7 @@ namespace Beyond
                 if (IsTemplatePresentHere(group , new Vector3Int(here.x+1 , here.y , here.z), "Floor")) return true ;
                 if (IsTemplatePresentHere(group , new Vector3Int(here.x , here.y , here.z-1), "Floor")) return true ;
                 if (IsTemplatePresentHere(group , new Vector3Int(here.x , here.y , here.z+1), "Floor")) return true ;
+                return false;
             }
             sts = cellSide.Down ; // because I need a default
             return false ;

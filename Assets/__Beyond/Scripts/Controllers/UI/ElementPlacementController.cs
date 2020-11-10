@@ -65,17 +65,19 @@ namespace Beyond
             //LayerMask layerMask = (ConstraintController.ShowOnTerrain(currentBC.template) ? ConstraintController.getTerrainMask() : ConstraintController.getBuildingsMask()) ;
             Vector3 position ;
 
-            //TODO : 999f ? really ??
-            if (Physics.Raycast(ray1, out hitInfo, /*UIController.Instance.forwardOffset*/ 999f, ConstraintController.getBuildingsMask()))
+            if (Physics.Raycast(ray1, out hitInfo, UIController.Instance.forwardOffset, ConstraintController.getBuildingsMask()))
             {
+                Debug.Log("Move to mouse: hit a BUILDING");
                 position = ConstraintController.PlaceGhost(currentBC, hitInfo.point, ConstraintController.getBuildingsMask());
             }
-            else if (Physics.Raycast(ray1, out hitInfo, /*UIController.Instance.forwardOffset*/ 999f , ConstraintController.getTerrainMask()))
+            else if (Physics.Raycast(ray1, out hitInfo, UIController.Instance.forwardOffset , ConstraintController.getTerrainMask()))
             {
+                Debug.Log("Move to mouse: hit TERRAIN");
                 position = ConstraintController.PlaceGhost(currentBC , hitInfo.point, ConstraintController.getTerrainMask());
             }
             else
             { // If we don't hit terrain, just make the object float in front of us
+                Debug.Log("Move to mouse: FLOAT");
                 Ray ray2 = Camera.main.ScreenPointToRay(mousePosition);
                 position = Camera.main.transform.position + ray2.direction * UIController.Instance.forwardOffset ;
             }
@@ -131,10 +133,9 @@ namespace Beyond
                     // Not needed aymore-angle between the rotation of the group and the rotation of the object on the Y axis : float angle = Mathf.Abs(currentPlaceableObject.transform.rotation.eulerAngles.y - closestGroup.rotation.eulerAngles.y );
 
                     // Then we can pass snapToSide directly
-                    if (ConstraintController.CanSnapToGroupHere(closestGroup , diffInt2 , currentBC.template , snappedPosition - pointWithOffset , out snapToSide))
+                    if (ConstraintController.CanSnapToGroupHere(closestGroup , diffInt2 , currentBC.template , snappedPosition - pointWithOffset , currentBC.transform.rotation , out snapToSide))
                     {
-                        currentBC.transform.position = snappedPosition ;
-                        currentBC.setObjectGroup(closestGroup ,diffInt2 , snapToSide);
+                        currentBC.SetBCinGroup(closestGroup, diffInt2 , snapToSide);
                     }
                     // else Debug.Log("Can't snap here because of group constraints");
                 }
@@ -229,6 +230,7 @@ namespace Beyond
                     CreateNewPlaceableObject(templateName) ;
                     // TODO : another hardcoded position. Not good. Yet, I must move the currentBC to where I started dragging or else I'm going to drag to some unknown place.
                     currentBC.transform.position = draggedBC[0].transform.position;
+                    currentBC.transform.rotation = draggedBC[0].transform.rotation;
 
                     // Instantiate a big bunch of placeable object based on what we are currently dragging
                     for (int i = 0; i < MaxDraggedObjectCount; i++)
@@ -236,7 +238,7 @@ namespace Beyond
                         BeyondComponent bc = TemplateController.CreateObject(templateName) ;
                         //TODO Better names, please
                         name = templateName + "_Ghost" + i ;
-                        bc.setObjectGroup(draggingGroup , lastGroupPosition , currentBC.side) ;
+                        bc.SetBCinGroup(draggingGroup , lastGroupPosition , draggedBC[0].side) ;
                         TemplateController.PlaceObject(bc , name , BC_State.Ghost) ;
                         bc.gameObject.SetActive(false) ;
                         draggedBC.Add(bc);
@@ -257,6 +259,7 @@ namespace Beyond
                 Vector3 objectPosition = currentBC.transform.position - currentBC.template.pivotOffset ;
                 objectPosition = Utility.RotateAroundPoint(objectPosition , draggingGroup.position , Quaternion.Inverse(draggingGroup.rotation)) ;
                 Vector3Int objectGroupPosition = Vector3Int.RoundToInt(objectPosition - draggingGroup.position);
+                Debug.Log("objectGroupPosition="+objectGroupPosition);
 
                 if (objectGroupPosition != lastGroupPosition)
                 {
@@ -274,14 +277,16 @@ namespace Beyond
                             //TODO : Best to move the current placeable object on that position, to keep it on a line
                             lastGroupPosition = objectGroupPosition ;
                             // The side decides which rotation we should use
-                            Vector3Int cellDiff = lastGroupPosition - draggedBC[0].groupPosition ;
+                            Vector3Int cellDiff = draggedBC[0].groupPosition - lastGroupPosition;
+                            Vector3Int oneCell = Vector3Int.RoundToInt((Vector3)cellDiff / cellDiff.magnitude) ;
+                            Debug.Log("Drag(). cellDiff="+cellDiff);
                             int i = 0;
                             for (int j = 0; j < cellDiff.magnitude; j++)
                             {
                                 if (i++ < MaxDraggedObjectCount)
                                 {
-                                    draggedBC[i].setObjectGroup(draggingGroup, draggedBC[0].groupPosition + Vector3Int.left * j , currentBC.side);
-                                    draggedBC[i].transform.position = draggedBC[0].transform.position + p1 * j + currentBC.template.pivotOffset;
+                                    draggedBC[i].SetBCinGroup(draggingGroup, draggedBC[0].groupPosition + oneCell * j , draggedBC[0].side);
+                                    draggedBC[i].transform.position = draggedBC[0].transform.position + p1 * j ;
                                     ConstraintController.SetCanPlaceObjectColour(draggedBC[i]);
                                     draggedBC[i].gameObject.SetActive(true);
                                 }
@@ -322,12 +327,8 @@ namespace Beyond
                                         Vector3Int currentPos = new Vector3Int( draggedBC[0].groupPosition.x + x * Xsign , 0 , draggedBC[0].groupPosition.z + z * Zsign ) ;
                                         if (i++<MaxDraggedObjectCount)
                                         {
-                                            draggedBC[i].setObjectGroup(draggingGroup , currentPos , currentBC.side) ;
-                                            draggedBC[i].transform.position = draggingGroup.position + 
-                                                currentPos.x * draggingGroup.rightNormalised +
-                                                currentPos.y * draggingGroup.upNormalised +
-                                                currentPos.z * draggingGroup.forwardNormalised +
-                                                currentBC.template.pivotOffset ;
+
+                                            draggedBC[i].SetBCinGroup(draggingGroup , currentPos, currentBC.side);
                                             ConstraintController.SetCanPlaceObjectColour(draggedBC[i]) ;    
                                             draggedBC[i].gameObject.SetActive(true);
                                         }

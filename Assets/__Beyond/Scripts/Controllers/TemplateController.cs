@@ -82,7 +82,7 @@ namespace Beyond
                 PlaceController.Instance.CreateNewBeyondGroup(bc);
             }
             // TODO : Really need to think hard about this: will the box collider as trigger really be a general case for all elements ?
-            bc.gameObject.GetComponent<BoxCollider>().isTrigger = true;
+            bc.gameObject.GetComponent<BoxCollider>().isTrigger = false;
             bc.gameObject.GetComponent<BoxCollider>().enabled = true;
             //TODO: Un-hardcode this shit
             bc.gameObject.layer = 9 ;
