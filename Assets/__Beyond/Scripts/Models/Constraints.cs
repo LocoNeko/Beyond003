@@ -15,13 +15,15 @@ namespace Beyond
         public List<int> cellSides {get; protected set;}
         public float depth {get; protected set;}
 
+        public LayerMask mask { get; protected set; }
+
         public Constraints()
         {
 
         }
 
         //TODO : nope. Make static methods for each type of constraint
-        public Constraints(string op, List<Constraints> cl , List<Template> tl , List<Vector3Int> ol, List<int> csl ,float d)
+        public Constraints(string op, List<Constraints> cl , List<Template> tl , List<Vector3Int> ol, List<int> csl ,float d , LayerMask lm)
         {
             operation = op;
             switch (operation)
@@ -61,8 +63,10 @@ namespace Beyond
                         cellSides.Add(cs);
                     }
                     break;
-                case "TOPCLEAR":
                 case "ALLCLEAR":
+                    mask = lm;
+                    break;
+                case "TOPCLEAR":
                 default:
                     return;
             }

@@ -26,6 +26,10 @@ namespace Beyond
             return getMask("Trees");
         }
 
+        public static LayerMask getTerrainAndTreesMask()
+        {
+            return LayerMask.GetMask(new string[] { "Ground", "Trees" });
+        }
         public static LayerMask getBuildingsMask()
         {
             return getMask("Buildings");
@@ -37,14 +41,14 @@ namespace Beyond
             return (layerMask == lm.value);
         }
 
+        //TODO : All this is currently hardcoded but should just do CheckConstraints(bc)
         public static bool CanPlace(BeyondComponent bc)
         {
+            // Won't work on a NULL BeyondComponent
             if (bc==null) return false;
-            if (bc.collidingWithTree())
-            {
-                Debug.Log(bc.gameObject.name+ " Colliding with tree");
-                return false;
-            }
+
+            // can't already have a the same object at the same place & position
+            if (IsTemplatePresentHere(bc.beyondGroup, bc.groupPosition, bc.template.name, bc.side)) return false;
             if (bc.template.name=="Foundation")
             {
                 // 1 - Foundations must be partially inside terrain, but their top must not be covered by it
@@ -52,12 +56,12 @@ namespace Beyond
                 if (!BaseInTerrain(bc)) return false;
                 if (!TopClear(bc)) return false;
                 if (IsTemplatePresentHere(bc.beyondGroup, bc.groupPosition, bc.template.name)) return false; // can't already have a foundation
+                if (AllClear(bc, ConstraintController.getTreesMask())) return false;
             }
             else
             {
-                // 2 -All non-foundations objects must be above terrain - return false immediately if they're not
-                if(bc.insideTerrain()) return false ;
-                if (IsTemplatePresentHere(bc.beyondGroup, bc.groupPosition, bc.template.name , bc.side)) return false; // can't already have a the same object at the same place & position
+                // 2 -All non-foundations objects must be clear of terrain and trees- return false immediately if they're not
+                if(AllClear(bc , getTerrainAndTreesMask())) return false ;
             }
 
             //3 - All non-foundations must be snapped to another building part
@@ -225,7 +229,7 @@ namespace Beyond
                 case "BASEIN":
                     return BaseInTerrain(bc);
                 case "ALLCLEAR":
-                    return AllClear(bc);
+                    return AllClear(bc , constraints.mask);
                 case "NEEDSONE":
                     return NeedsOne(bc , constraints.templatesList, constraints.offsetsList, constraints.cellSides);
                 case "NEEDSALL":
@@ -266,7 +270,7 @@ namespace Beyond
             return !result;
         }
 
-        // Is the bottom inside terrain by enough ?I also need to take the current heightOffset into accunt
+        // Is the bottom inside terrain by enough ?
         private static bool BaseInTerrain(BeyondComponent bc)
         {
             Vector3 BoxCast = bc.template.castBox ;
@@ -274,7 +278,7 @@ namespace Beyond
             Quaternion q = bc.transform.gameObject.transform.rotation ;
             
             // TODO : get this from the UI Controller, set it in the ElementPlacementController
-            float YOffset = 0.1f;
+            float YOffset = 0.0f;
 
             // Cast 4 boxes at each corner of the bottom of the object
             // Their centres are: p + BoxCast in both X and Z, plus FoundationInTerrainBy / 2
@@ -284,15 +288,8 @@ namespace Beyond
                 {
                     Vector3 point = (p + new Vector3((BoxCast.x - FoundationInTerrainBy/2) * i , - BoxCast.y + FoundationInTerrainBy/2 + YOffset , (BoxCast.z - FoundationInTerrainBy/2) * j ))  ;
                     point = Utility.RotateAroundPoint(point , p , q) ;
-                    /*
-                    The line above should be equivalent to the 3 lines below
-                    Vector3 direction = point - p ; // In order to apply the rotation, we need to find a vector from p to this new point
-                    direction = q * direction ; // we can then rotate that direction
-                    point = direction + p; // and apply it back, now fully rotated, to the original point p
-                    */
 
                     //Debug.DrawLine(point + (Vector3.down * YOffset), new Vector3(point.x , point.y- FoundationInTerrainBy/2 , point.z) , Color.yellow , 0.25f);
-
                     // The height of the boxes' starting point must be offset by their height (BoxCast.y) and YOffset
                     if (Physics.BoxCast(point - (Vector3.down * (BoxCast.y - YOffset)), BoxCast, Vector3.down, q, Mathf.Infinity , getTerrainMask()))
                     {
@@ -303,40 +300,11 @@ namespace Beyond
             return true ;
         }
 
-        /*
-        BaseInTerrain should replace this
-        public static bool BaseIsInTerrain(Vector3 p , Vector3 BoxCast , Quaternion q , float YOffset)
+        private static bool AllClear(BeyondComponent bc , LayerMask mask)
         {
-            // Cast 4 boxes at each corner of the bottom of the object
-            // Their centres are: p + BoxCast in both X and Z, plus FoundationInTerrainBy / 2
-            for (float i = -1; i <= 2; i+=2)
-            {
-                for (float j = -1; j <= 2; j+=2)
-                {
-                    Vector3 point = (p + new Vector3((BoxCast.x - FoundationInTerrainBy/2) * i , - BoxCast.y + FoundationInTerrainBy/2 + YOffset , (BoxCast.z - FoundationInTerrainBy/2) * j ))  ;
-                    point = ElementPlacementController.RotateAroundPoint(point , p , q) ;
-                    //The line above should be equivalent to the 3 lines below
-                    //Vector3 direction = point - p ; // In order to apply the rotation, we need to find a vector from p to this new point
-                    //direction = q * direction ; // we can then rotate that direction
-                    //point = direction + p; // and apply it back, now fully rotated, to the original point p
-
-                    Debug.DrawLine(point + (Vector3.down * YOffset), new Vector3(point.x , point.y- FoundationInTerrainBy/2 , point.z) , Color.yellow , 0.25f);
-
-                    // The height of the boxes' starting point must be offset by their height (BoxCast.y) and YOffset
-                    RaycastHit hitInfo;
-                    if (Physics.BoxCast(point - (Vector3.down * (BoxCast.y - YOffset)), BoxCast, Vector3.down, out hitInfo, q, Mathf.Infinity , getTerrainMask()))
-                    {
-                        return false ;
-                    }
-                }
-            }
-            return true ;
-        }
-        */
-
-        private static bool AllClear(BeyondComponent bc)
-        {
-            throw new NotImplementedException();
+            Collider[] collidersHit = Physics.OverlapBox(bc.transform.position, bc.template.castBox, bc.transform.rotation, mask);
+            // string debug_string="insideTerrain overlap boxes="; foreach (Collider c in collidersHit) debug_string += c.gameObject.name + ","; Debug.Log(debug_string);
+            return (collidersHit.Length > 0);
         }
 
         private static bool NeedsOne(BeyondComponent bc, List<Template> templatesList, List<Vector3Int> offsetsList, List<int> cellSides)

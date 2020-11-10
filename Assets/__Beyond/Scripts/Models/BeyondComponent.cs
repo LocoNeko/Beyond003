@@ -188,13 +188,6 @@ namespace Beyond
             beyondGroup = null;
         }
 
-        public bool insideTerrain()
-        {
-            Collider[] collidersHit = Physics.OverlapBox(transform.position , template.castBox , transform.rotation , ConstraintController.getTerrainMask()) ;
-            // string debug_string="insideTerrain overlap boxes="; foreach (Collider c in collidersHit) debug_string += c.gameObject.name + ","; Debug.Log(debug_string);
-            return (collidersHit.Length >0);
-        }
-
         public bool collidingWithBuilding(bool checkSameGroup = true)
         {
             foreach (GameObject g in objectsTriggered)
@@ -212,12 +205,6 @@ namespace Beyond
             }
             //Debug.Log("collidingWithBuilding FALSE");
             return false;
-        }
-
-        public bool collidingWithTree()
-        {
-            Collider[] hitTreeColliders = Physics.OverlapBox(transform.position, template.castBox, transform.rotation, ConstraintController.getTreesMask());
-            return (hitTreeColliders.Length > 0) ;
         }
 
         void OnTriggerEnter(Collider c)
