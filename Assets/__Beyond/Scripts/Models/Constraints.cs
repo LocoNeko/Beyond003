@@ -4,95 +4,130 @@ using System;
 
 namespace Beyond
 {
-
-    // This script is attached to all objects specific to Beyond that can be created & placed
-    public class Constraints : MonoBehaviour
+    public class Constraints
     {
         public string operation {get; protected set;}
         public List<Constraints> constraintsList {get; protected set;}
-        public List<Template> templatesList {get; protected set;} // I could pass template names (strings) instead of templates
+        public List<string> templateNamesList {get; protected set;}
         public List<Vector3Int> offsetsList {get; protected set;}
-        public List<int> cellSides {get; protected set;}
+        public List<cellSide> cellSides {get; protected set;}
         public float depth {get; protected set;}
         public LayerMask mask { get; protected set; }
 
-        public Constraints()
-        {
-
-        }
-
-        //TODO : nope. Make static methods for each type of constraint
-        public Constraints(string op, List<Constraints> cl , List<Template> tl , List<Vector3Int> ol, List<int> csl ,float d , LayerMask lm)
-        {
-            operation = op;
-            switch (operation)
-            {
-                case "OR":
-                    constraintsList = new List<Constraints>();
-                    foreach (Constraints c in cl)
-                    {
-                        constraintsList.Add(c);
-                    }
-                    break;
-                case "AND":
-                    constraintsList = new List<Constraints>();
-                    foreach (Constraints c in cl)
-                    {
-                        constraintsList.Add(c);
-                    }
-                    break;
-                case "BASEIN":
-                    depth = d;
-                    break;
-                case "NEEDSONE":
-                case "NEEDSALL":
-                    templatesList = new List<Template>();
-                    offsetsList = new List<Vector3Int>();
-                    cellSides = new List<int>();
-                    foreach (Template t in tl)
-                    {
-                        templatesList.Add(t);
-                    }
-                    foreach (Vector3Int v in ol)
-                    {
-                        offsetsList.Add(v);
-                    }
-                    foreach (int cs in csl)
-                    {
-                        cellSides.Add(cs);
-                    }
-                    break;
-                case "ALLCLEAR":
-                    mask = lm;
-                    break;
-                case "TOPCLEAR":
-                default:
-                    return;
-            }
-        }
-
-        public static Constraints Create_OR(List<Constraints> cl)
+        public static Constraints Create_OR(List<Constraints> constraintsList)
         {
             Constraints c = new Constraints();
             c.operation = "OR";
             c.constraintsList = new List<Constraints>() ;
-            foreach (Constraints c2 in cl)
+            foreach (Constraints c2 in constraintsList)
             {
                 c.constraintsList.Add(c2);
             }
             return c ;
         }
 
-        public static Constraints Create_AND(List<Constraints> cl)
+        public static Constraints Create_AND(List<Constraints> constraintsList)
         {
             Constraints c = new Constraints();
             c.operation = "AND";
             c.constraintsList = new List<Constraints>() ;
-            foreach (Constraints c2 in cl)
+            foreach (Constraints c2 in constraintsList)
             {
                 c.constraintsList.Add(c2);
             }
             return c ;
         }
+
+        public static Constraints Create_BASEIN(float depth)
+        {
+            Constraints c = new Constraints();
+            c.operation = "BASEIN";
+            c.depth = depth ;
+            return c ;
+        }
+
+        public static Constraints Create_NEEDSONE(List<string> templateNames , List<Vector3Int> offsets, List<cellSide> sides)
+        {
+            Constraints c = new Constraints();
+            c.operation = "NEEDSONE";
+            c.templateNamesList = new List<string>();
+            c.offsetsList = new List<Vector3Int>();
+            c.cellSides = new List<cellSide>();
+
+            foreach (string s in templateNames)
+            {
+                c.templateNamesList.Add(s);
+            }
+            foreach (Vector3Int v in offsets)
+            {
+                c.offsetsList.Add(v);
+            }
+            foreach (cellSide cs in sides)
+            {
+                c.cellSides.Add(cs);
+            }
+            return c ;
+        }
+
+        public static Constraints Create_NEEDSALL(List<string> templateNames , List<Vector3Int> offsets, List<cellSide> sides)
+        {
+            Constraints c = new Constraints();
+            c.operation = "NEEDSALL";
+            c.templateNamesList = new List<string>();
+            c.offsetsList = new List<Vector3Int>();
+            c.cellSides = new List<cellSide>();
+
+            foreach (string s in templateNames)
+            {
+                c.templateNamesList.Add(s);
+            }
+            foreach (Vector3Int v in offsets)
+            {
+                c.offsetsList.Add(v);
+            }
+            foreach (cellSide cs in sides)
+            {
+                c.cellSides.Add(cs);
+            }
+            return c ;
+        }
+
+        public static Constraints Create_ALLCLEAR(LayerMask lm)
+        {
+            Constraints c = new Constraints();
+            c.operation = "ALLCLEAR";
+            c.mask = lm ;
+            return c ;
+        }
+
+        public static Constraints Create_TOPCLEAR(LayerMask lm)
+        {
+            Constraints c = new Constraints();
+            c.operation = "TOPCLEAR";
+            c.mask = lm ;
+            return c ;
+        }
+
+        public static Constraints Create_FIRSTINGROUP()
+        {
+            Constraints c = new Constraints();
+            c.operation = "FIRSTINGROUP";
+            return c ;
+        }
+
+        public static string ShowConstraints(Constraints c)
+        {
+            if (c.operation == "OR" || c.operation == "AND")
+            {
+                string listofconstraints = "" ;
+                foreach (Constraints c2 in c.constraintsList)
+                {
+                    listofconstraints+=ShowConstraints(c2)+",";
+                }
+                return c.operation+"("+listofconstraints+")";
+            }
+            else return c.operation ;
+        }
+
     }
 }

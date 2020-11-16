@@ -132,27 +132,31 @@ namespace Beyond
         }
         */
 
-        //TODO: this should replace setObjectGroup and move the transform where it should be
-        public void SetBCinGroup (BeyondGroup g , Vector3Int p , cellSide cs , bool firstObject=false)
+        public void SetBCinGroup (BeyondGroup g , Vector3Int p , bool firstObject=false)
         { // TODO should make that more robust : what if g is null ?
             unsetObjectGroup();
             if (g!=null)
             {
                 beyondGroup = g ;
                 groupPosition = p ;
-                side = cs ;
+
+                // If this template can only be on a specific side, use it, otherwise determine the side based on the rotation of the BC
+                side = (template.fixedSide == null) ? getSideByRotation(transform.rotation) : (cellSide)template.fixedSide ;
+
+                //TODO : Maybe I need one last check based on side : is there really no object here on the same postion and rotation 
+
                 // The first object should not be offset or rotated by the group, since it sets the group position and rotation 
                 if (!firstObject)
                 {
                     // Rotate the cell's position to apply the group's rotation
                     Vector3 rotatedCellPosition = Utility.RotateAroundPoint(p , Vector3.zero , g.rotation) ;
                     // Rotate the pivot's position to apply the group's rotation and the side's rotation 
-                    Vector3 rotatedPivotOffset = Utility.RotateAroundPoint(template.pivotOffset, Vector3.zero , sideRotation(cs) * g.rotation) ;
+                    Vector3 rotatedPivotOffset = Utility.RotateAroundPoint(template.pivotOffset, Vector3.zero , sideRotation(side) * g.rotation) ;
                     Vector3 ObjectPosition = g.position + rotatedCellPosition + rotatedPivotOffset ;
 
                     transform.position = ObjectPosition ;
                     // Rotate the object by the group's rotation + its cellSide rotation
-                    transform.rotation = g.rotation * sideRotation(cs) ;
+                    transform.rotation = g.rotation * sideRotation(side) ;
                 }
                 g.addBeyondComponent(this);
             }
@@ -227,8 +231,16 @@ namespace Beyond
             if (beyondGroup != null)
             {
                 beyondGroup.removeBeyondComponent(this);
+                
             }
             beyondGroup = null;
+        }
+
+        public bool insideTerrain()
+        {
+            Collider[] collidersHit = Physics.OverlapBox(transform.position , template.castBox , transform.rotation , ConstraintController.getTerrainMask()) ;
+            // string debug_string="insideTerrain overlap boxes="; foreach (Collider c in collidersHit) debug_string += c.gameObject.name + ","; Debug.Log(debug_string);
+            return (collidersHit.Length >0);
         }
 
         public bool collidingWithBuilding(bool checkSameGroup = true)
@@ -248,6 +260,12 @@ namespace Beyond
             }
             //Debug.Log("collidingWithBuilding FALSE");
             return false;
+        }
+
+        public bool collidingWithTree()
+        {
+            Collider[] hitTreeColliders = Physics.OverlapBox(transform.position, template.castBox, transform.rotation, ConstraintController.getTreesMask());
+            return (hitTreeColliders.Length > 0) ;
         }
 
         void OnTriggerEnter(Collider c)

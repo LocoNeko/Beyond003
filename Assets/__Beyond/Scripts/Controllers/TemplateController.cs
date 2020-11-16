@@ -21,21 +21,47 @@ namespace Beyond
 
         private void loadAllTemplates()
         {
+            Constraints c , c1 , c2 , c3 , c4 , c5 , c6 ;
+            
+            // FOUNDATION - TODO : Move hardcoding below to JSON
+            c1 = Constraints.Create_NEEDSONE(
+                new List<string>(){"Foundation"} ,
+                new List<Vector3Int>(){new Vector3Int(-1 , 0 , 0) , new Vector3Int(1 , 0 , 0), new Vector3Int(0 , 0 , -1), new Vector3Int(0 , 0 , 1)} ,
+                new List<cellSide>() {cellSide.Down}
+            ) ;
+            c2 = Constraints.Create_FIRSTINGROUP();
+            c3 = Constraints.Create_OR(new List<Constraints>(){c1,c2}) ;
+            c4 = Constraints.Create_BASEIN(ConstraintController.FoundationInTerrainBy);
+            c5 = Constraints.Create_TOPCLEAR(ConstraintController.getTerrainAndTreesMask()) ;
+            c6 = Constraints.Create_ALLCLEAR(ConstraintController.getTreesMask()) ;
+            c = Constraints.Create_AND(new List<Constraints>(){c3,c4,c5,c6}) ;
+
             templates.Add("Foundation" , new Template(
                 name: "Foundation" ,
                 castBox: new Vector3(0.5f, 0.55f, 0.5f) ,
                 prefab_go: Resources.Load<GameObject>("Prefabs/Foundation") ,
                 pivotOffset: new Vector3(0, -0.95f, 0f) ,
-                constraints: null ,
-                dragDimensions: 2
+                constraints: c ,
+                dragDimensions: 2 ,
+                fixedSide: cellSide.Down
             ));
+
+            // WALL
+            c1 = Constraints.Create_NEEDSONE(
+                new List<string>(){"Foundation"} ,
+                new List<Vector3Int>(){new Vector3Int(0 , 0 , 0)} ,
+                new List<cellSide>() {cellSide.Down}
+            ) ; 
+            c2 = Constraints.Create_ALLCLEAR(ConstraintController.getTerrainAndTreesMask()) ;
+            c = Constraints.Create_AND(new List<Constraints>(){c1,c2}) ;
+
             templates.Add("Wall" , new Template(
                 name: "Wall" ,
                 castBox: new Vector3(0.5f, 1.45f, 0.1f) ,
                 prefab_go: Resources.Load<GameObject>("Prefabs/Wall") ,
                 pivotOffset: new Vector3(0f, 1.05f, -0.4f) ,
                 cells: new List<Vector3Int>() {new Vector3Int(0,0,0), new Vector3Int(0,1,0), new Vector3Int(0,2,0)},
-                constraints: null ,
+                constraints: c ,
                 dragDimensions: 1
             ));
             templates.Add("Wallhole" , new Template(
@@ -44,16 +70,19 @@ namespace Beyond
                 prefab_go: Resources.Load<GameObject>("Prefabs/Wallhole") ,
                 pivotOffset: new Vector3(0f, 1.25f, -0.4f) ,
                 cells: new List<Vector3Int>() {new Vector3Int(0,0,0), new Vector3Int(0,1,0), new Vector3Int(0,2,0)},
-                constraints: null ,
+                constraints: c ,
                 dragDimensions: 1
             ));
+
+            
             templates.Add("Floor" , new Template(
                 name: "Floor" ,
                 castBox: new Vector3(0.5f, 0.05f, 0.5f) ,
                 prefab_go: Resources.Load<GameObject>("Prefabs/Floor") ,
                 pivotOffset: new Vector3(0, -0.45f, 0f) ,
                 constraints: null ,
-                dragDimensions: 2
+                dragDimensions: 2 ,
+                fixedSide: cellSide.Down
             ));
             //TODO - Roof
             //TODO - WallOpened

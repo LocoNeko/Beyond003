@@ -67,17 +67,17 @@ namespace Beyond
 
             if (Physics.Raycast(ray1, out hitInfo, UIController.Instance.forwardOffset, ConstraintController.getBuildingsMask()))
             {
-                Debug.Log("Move to mouse: hit a BUILDING");
+                //Debug.Log("Move to mouse: hit a BUILDING");
                 position = ConstraintController.PlaceGhost(currentBC, hitInfo.point, ConstraintController.getBuildingsMask());
             }
             else if (Physics.Raycast(ray1, out hitInfo, UIController.Instance.forwardOffset , ConstraintController.getTerrainMask()))
             {
-                Debug.Log("Move to mouse: hit TERRAIN");
+                //Debug.Log("Move to mouse: hit TERRAIN");
                 position = ConstraintController.PlaceGhost(currentBC , hitInfo.point, ConstraintController.getTerrainMask());
             }
             else
             { // If we don't hit terrain, just make the object float in front of us
-                Debug.Log("Move to mouse: FLOAT");
+                //Debug.Log("Move to mouse: FLOAT");
                 Ray ray2 = Camera.main.ScreenPointToRay(mousePosition);
                 position = Camera.main.transform.position + ray2.direction * UIController.Instance.forwardOffset ;
             }
@@ -128,14 +128,13 @@ namespace Beyond
 
                 if (snappedPosition.y>=minY)
                 { // Snap in place only if object's top is above ground
-                    cellSide snapToSide;
 
                     // Not needed aymore-angle between the rotation of the group and the rotation of the object on the Y axis : float angle = Mathf.Abs(currentPlaceableObject.transform.rotation.eulerAngles.y - closestGroup.rotation.eulerAngles.y );
 
-                    // Then we can pass snapToSide directly
-                    if (ConstraintController.CanSnapToGroupHere(closestGroup , diffInt2 , currentBC.template , snappedPosition - pointWithOffset , currentBC.transform.rotation , out snapToSide))
+                    //if (ConstraintController.CanSnapToGroupHere(closestGroup , diffInt2 , currentBC.template , snappedPosition - pointWithOffset , currentBC.transform.rotation , out snapToSide))
+                    if (ConstraintController.CanSnapTo(currentBC , closestGroup , diffInt2))
                     {
-                        currentBC.SetBCinGroup(closestGroup, diffInt2 , snapToSide);
+                        currentBC.SetBCinGroup(closestGroup, diffInt2);
                     }
                     // else Debug.Log("Can't snap here because of group constraints");
                 }
@@ -238,7 +237,7 @@ namespace Beyond
                         BeyondComponent bc = TemplateController.CreateObject(templateName) ;
                         //TODO Better names, please
                         name = templateName + "_Ghost" + i ;
-                        bc.SetBCinGroup(draggingGroup , lastGroupPosition , draggedBC[0].side) ;
+                        bc.SetBCinGroup(draggingGroup , lastGroupPosition ) ;
                         TemplateController.PlaceObject(bc , name , BC_State.Ghost) ;
                         bc.gameObject.SetActive(false) ;
                         draggedBC.Add(bc);
@@ -259,7 +258,7 @@ namespace Beyond
                 Vector3 objectPosition = currentBC.transform.position - currentBC.template.pivotOffset ;
                 objectPosition = Utility.RotateAroundPoint(objectPosition , draggingGroup.position , Quaternion.Inverse(draggingGroup.rotation)) ;
                 Vector3Int objectGroupPosition = Vector3Int.RoundToInt(objectPosition - draggingGroup.position);
-                Debug.Log("objectGroupPosition="+objectGroupPosition);
+                //Debug.Log("objectGroupPosition="+objectGroupPosition);
 
                 if (objectGroupPosition != lastGroupPosition)
                 {
@@ -279,14 +278,15 @@ namespace Beyond
                             // The side decides which rotation we should use
                             Vector3Int cellDiff = draggedBC[0].groupPosition - lastGroupPosition;
                             Vector3Int oneCell = Vector3Int.RoundToInt((Vector3)cellDiff / cellDiff.magnitude) ;
-                            Debug.Log("Drag(). cellDiff="+cellDiff);
+                            //Debug.Log("Drag(). cellDiff="+cellDiff);
                             int i = 0;
                             for (int j = 0; j < cellDiff.magnitude; j++)
                             {
                                 if (i++ < MaxDraggedObjectCount)
                                 {
-                                    draggedBC[i].SetBCinGroup(draggingGroup, draggedBC[0].groupPosition + oneCell * j , draggedBC[0].side);
-                                    draggedBC[i].transform.position = draggedBC[0].transform.position + p1 * j ;
+                                    //draggedBC[i].transform.rotation = draggedBC[0].transform.rotation ;
+                                    draggedBC[i].SetBCinGroup(draggingGroup, draggedBC[0].groupPosition + oneCell * j);
+                                    //draggedBC[i].transform.position = draggedBC[0].transform.position + p1 * j ;
                                     ConstraintController.SetCanPlaceObjectColour(draggedBC[i]);
                                     draggedBC[i].gameObject.SetActive(true);
                                 }
@@ -327,9 +327,8 @@ namespace Beyond
                                         Vector3Int currentPos = new Vector3Int( draggedBC[0].groupPosition.x + x * Xsign , 0 , draggedBC[0].groupPosition.z + z * Zsign ) ;
                                         if (i++<MaxDraggedObjectCount)
                                         {
-
-                                            draggedBC[i].SetBCinGroup(draggingGroup , currentPos, currentBC.side);
-                                            ConstraintController.SetCanPlaceObjectColour(draggedBC[i]) ;    
+                                            draggedBC[i].SetBCinGroup(draggingGroup , currentPos);
+                                            ConstraintController.SetCanPlaceObjectColour(draggedBC[i]) ;
                                             draggedBC[i].gameObject.SetActive(true);
                                         }
                                     }
