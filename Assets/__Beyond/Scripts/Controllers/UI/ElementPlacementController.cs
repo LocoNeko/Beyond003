@@ -14,6 +14,9 @@ namespace Beyond
         private BeyondComponent currentBC;
         private float mouseWheelRotation;
         public float groupSnapTolerance = 0.5f;
+        public GameObject testSphere;
+        [SerializeField]
+        public Vector3 dragTo;
         Vector3 mousePosition;
         int nbObjectsPlaced=0;
         // TODO Dragging stuff: to sort out
@@ -212,39 +215,7 @@ namespace Beyond
         {
             // Start draggin (we have no draggedBC)
             if (Input.GetMouseButtonDown(0) && draggedBC.Count==0)
-            {
-                if (ConstraintController.CanPlace(currentBC))
-                {
-                    string templateName = currentBC.template.name ;
-                    string name = templateName + "_" + (nbObjectsPlaced++) ;
-
-                    // Place the first Ghost = still green, still not collidin'
-                    TemplateController.PlaceObject(currentBC , name , BC_State.Ghost) ;
-
-                    draggedBC.Add(currentBC);
-                    draggingGroup = currentBC.beyondGroup ;
-                    lastGroupPosition = currentBC.groupPosition ;
-
-                    currentBC = null ;
-                    CreateNewPlaceableObject(templateName) ;
-                    // TODO : another hardcoded position. Not good. Yet, I must move the currentBC to where I started dragging or else I'm going to drag to some unknown place.
-                    currentBC.transform.position = draggedBC[0].transform.position;
-                    currentBC.transform.rotation = draggedBC[0].transform.rotation;
-
-                    // Instantiate a big bunch of placeable object based on what we are currently dragging
-                    for (int i = 0; i < MaxDraggedObjectCount; i++)
-                    {
-                        BeyondComponent bc = TemplateController.CreateObject(templateName) ;
-                        //TODO Better names, please
-                        name = templateName + "_Ghost" + i ;
-                        bc.SetBCinGroup(draggingGroup , lastGroupPosition ) ;
-                        TemplateController.PlaceObject(bc , name , BC_State.Ghost) ;
-                        bc.gameObject.SetActive(false) ;
-                        draggedBC.Add(bc);
-                    }
-                }
-            }
-
+                StartDrag();
 
             if (Input.GetMouseButton(0) && draggingGroup != null)
             { // we are dragging AND we have an actual group we're dragging
@@ -254,13 +225,13 @@ namespace Beyond
                 */ 
 
                 // 1 - Calculate the current position in the group for  currentPlaceableObject
-
                 Vector3 objectPosition = currentBC.transform.position - currentBC.template.pivotOffset ;
                 objectPosition = Utility.RotateAroundPoint(objectPosition , draggingGroup.position , Quaternion.Inverse(draggingGroup.rotation)) ;
                 Vector3Int objectGroupPosition = Vector3Int.RoundToInt(objectPosition - draggingGroup.position);
-                //Debug.Log("objectGroupPosition="+objectGroupPosition);
 
-                if (objectGroupPosition != lastGroupPosition)
+                //TODO : I had to add draggedBC.Count > 0 to correct an error on draggedBC being empty, but how could it be empty ?
+                // If there was a change in position since last time we dragged, update
+                if (objectGroupPosition != lastGroupPosition && draggedBC.Count > 0)
                 {
                     Vector3 p1 ;
                     Vector3 p2 ;
@@ -268,86 +239,14 @@ namespace Beyond
 
                     if ( NbDimensions == 1)
                     { // Dragging a line
-                        Vector3 dragTo = Utility.ClosestPointOnLine(p2 , p2+p1 , objectPosition) ;
-                        Debug.DrawLine(draggedBC[0].transform.position, dragTo, Color.red , 1f);
-                        objectGroupPosition = Vector3Int.RoundToInt(dragTo - draggingGroup.position);
-                        if (objectGroupPosition != lastGroupPosition)
-                        { // even after projecting on a line, are we still in a new cell ?
-                            //TODO : Best to move the current placeable object on that position, to keep it on a line
-                            lastGroupPosition = objectGroupPosition ;
-                            // The side decides which rotation we should use
-                            Vector3Int cellDiff = draggedBC[0].groupPosition - lastGroupPosition;
-                            Vector3Int oneCell = Vector3Int.RoundToInt((Vector3)cellDiff / cellDiff.magnitude) ;
-                            //Debug.Log("Drag(). cellDiff="+cellDiff);
-                            int i = 0;
-                            for (int j = 0; j < cellDiff.magnitude; j++)
-                            {
-                                if (i++ < MaxDraggedObjectCount)
-                                {
-                                    //draggedBC[i].transform.rotation = draggedBC[0].transform.rotation ;
-                                    draggedBC[i].SetBCinGroup(draggingGroup, draggedBC[0].groupPosition + oneCell * j);
-                                    //draggedBC[i].transform.position = draggedBC[0].transform.position + p1 * j ;
-                                    ConstraintController.SetCanPlaceObjectColour(draggedBC[i]);
-                                    draggedBC[i].gameObject.SetActive(true);
-                                }
-                            }
-                            // Deactivate all ghosts that are not used in the area we are currently dragging
-                            if (i >= 0)
-                            {
-                                for (int j = i + 1; j <= MaxDraggedObjectCount; j++)
-                                {
-                                    draggedBC[j].gameObject.SetActive(false);
-                                }
-                            }
-                        }
-
+                        Drag1D(objectGroupPosition, objectPosition, p1, p2);
                     }
 
                     if ( NbDimensions == 2)
                     { // Dragging a plane
-                        
-                        Plane p = new Plane(p1 , p2) ;
-                        Vector3 dragTo = p.ClosestPointOnPlane(objectPosition) ;
-                        // Correct ObjectGroupPosition so we are in the plane we are dragging in 
-                        objectGroupPosition = Vector3Int.RoundToInt(dragTo - draggingGroup.position);
-
-                        if (objectGroupPosition != lastGroupPosition)
-                        { // even after projecting on a plane, are we still in a new cell ?
-                            lastGroupPosition = objectGroupPosition ;
-                            //Debug.Log("Dragging to a new position on a plane in the group: "+lastGroupPosition+" from draggedBC[0]: "+draggedBC[0].groupPosition);
-                            int Xsign = (lastGroupPosition.x >= draggedBC[0].groupPosition.x ? 1 : -1) ;
-                            int Zsign = (lastGroupPosition.z >= draggedBC[0].groupPosition.z ? 1 : -1) ;
-                            int i=0;
-                            for (int x=0 ; x<=Mathf.Abs(lastGroupPosition.x - draggedBC[0].groupPosition.x) ; x++)
-                            {
-                                for (int z=0 ; z<=Mathf.Abs(lastGroupPosition.z - draggedBC[0].groupPosition.z) ; z++)
-                                { // go from the origin of the drag to the current position
-                                    if (x!=0 || z!=0)
-                                    {
-                                        Vector3Int currentPos = new Vector3Int( draggedBC[0].groupPosition.x + x * Xsign , 0 , draggedBC[0].groupPosition.z + z * Zsign ) ;
-                                        if (i++<MaxDraggedObjectCount)
-                                        {
-                                            draggedBC[i].SetBCinGroup(draggingGroup , currentPos);
-                                            ConstraintController.SetCanPlaceObjectColour(draggedBC[i]) ;
-                                            draggedBC[i].gameObject.SetActive(true);
-                                        }
-                                    }
-                                }
-                            }
-                            // Deactivate all ghosts that are not used in the area we are currently dragging
-                            if (i>=0)
-                            {
-                                for (int j = i+1; j <= MaxDraggedObjectCount; j++)
-                                {
-                                    draggedBC[j].gameObject.SetActive(false);
-                                }
-                            }
-                        }
+                        Drag2D(objectGroupPosition, objectPosition, p1, p2);
                     }
                 }
-
-
-
 
                 /*
                 Snap();
@@ -373,6 +272,118 @@ namespace Beyond
                 // TODO Get where we currently are compared to the last object in the dragged list
                 // If we are not in the same cell, put the current object in the dragged list and instantiate a new ghost object
                 // TODO : dragging back : we should be able to destroy ghosts we are placing over, except the last one
+            }
+        }
+
+        void StartDrag()
+        {
+            if (ConstraintController.CanPlace(currentBC))
+            {
+                string templateName = currentBC.template.name;
+                string name = templateName + "_" + (nbObjectsPlaced++);
+
+                // Place the first Ghost = still green, still not collidin'
+                TemplateController.PlaceObject(currentBC, name, BC_State.Ghost);
+
+                draggedBC.Add(currentBC);
+                draggingGroup = currentBC.beyondGroup;
+                lastGroupPosition = currentBC.groupPosition;
+
+                currentBC = null;
+                CreateNewPlaceableObject(templateName);
+                // TODO : another hardcoded position. Not good. Yet, I must move the currentBC to where I started dragging or else I'm going to drag to some unknown place.
+                currentBC.transform.position = draggedBC[0].transform.position;
+                currentBC.transform.rotation = draggedBC[0].transform.rotation;
+
+                // Instantiate a big bunch of placeable object based on what we are currently dragging
+                for (int i = 0; i < MaxDraggedObjectCount; i++)
+                {
+                    BeyondComponent bc = TemplateController.CreateObject(templateName);
+                    //TODO Better names, please
+                    name = templateName + "_Ghost" + i;
+                    bc.SetBCinGroup(draggingGroup, lastGroupPosition);
+                    TemplateController.PlaceObject(bc, name, BC_State.Ghost);
+                    bc.gameObject.SetActive(false);
+                    draggedBC.Add(bc);
+                }
+            }
+        }
+
+        void Drag1D(Vector3Int objectGroupPosition , Vector3 objectPosition , Vector3 p1  , Vector3 p2)
+        {
+            dragTo = Utility.ClosestPointOnLine(p2, p2 + p1, objectPosition);
+            testSphere.transform.position = dragTo;
+            objectGroupPosition = Vector3Int.RoundToInt(dragTo - draggingGroup.position);
+            if (objectGroupPosition != lastGroupPosition)
+            { // even after projecting on a line, are we still in a new cell ?
+              //TODO : Best to move the current placeable object on that position, to keep it on a line
+                lastGroupPosition = objectGroupPosition;
+                // The side decides which rotation we should use
+                Vector3Int cellDiff = draggedBC[0].groupPosition - lastGroupPosition;
+                Vector3Int oneCell = Vector3Int.RoundToInt((Vector3)cellDiff / cellDiff.magnitude);
+                //Debug.Log("Drag(). cellDiff="+cellDiff);
+                int i = 0;
+                for (int j = 0; j < cellDiff.magnitude; j++)
+                {
+                    if (i++ < MaxDraggedObjectCount)
+                    {
+                        draggedBC[i].SetBCinGroup(draggingGroup, draggedBC[0].groupPosition + oneCell * j);
+                        //draggedBC[i].transform.rotation = draggedBC[0].transform.rotation ;
+                        //draggedBC[i].transform.position = draggedBC[0].transform.position + p1 * j ;
+                        ConstraintController.SetCanPlaceObjectColour(draggedBC[i]);
+                        draggedBC[i].gameObject.SetActive(true);
+                    }
+                }
+                // Deactivate all ghosts that are not used in the area we are currently dragging
+                if (i >= 0)
+                {
+                    for (int j = i + 1; j <= MaxDraggedObjectCount; j++)
+                    {
+                        draggedBC[j].gameObject.SetActive(false);
+                    }
+                }
+            }
+        }
+
+        void Drag2D(Vector3Int objectGroupPosition, Vector3 objectPosition, Vector3 p1, Vector3 p2)
+        {
+            Plane p = new Plane(p1, p2);
+            Vector3 dragTo = p.ClosestPointOnPlane(objectPosition);
+            // Correct ObjectGroupPosition so we are in the plane we are dragging in 
+            objectGroupPosition = Vector3Int.RoundToInt(dragTo - draggingGroup.position);
+
+            if (objectGroupPosition != lastGroupPosition)
+            { // even after projecting on a plane, are we still in a new cell ?
+                lastGroupPosition = objectGroupPosition;
+                //Debug.Log("Dragging to a new position on a plane in the group: "+lastGroupPosition+" from draggedBC[0]: "+draggedBC[0].groupPosition);
+                int Xsign = (lastGroupPosition.x >= draggedBC[0].groupPosition.x ? 1 : -1);
+                int Zsign = (lastGroupPosition.z >= draggedBC[0].groupPosition.z ? 1 : -1);
+                int i = 0;
+                for (int x = 0; x <= Mathf.Abs(lastGroupPosition.x - draggedBC[0].groupPosition.x); x++)
+                {
+                    for (int z = 0; z <= Mathf.Abs(lastGroupPosition.z - draggedBC[0].groupPosition.z); z++)
+                    { // go from the origin of the drag to the current position
+                        if (x != 0 || z != 0)
+                        {
+                            Vector3Int currentPos = new Vector3Int(draggedBC[0].groupPosition.x + x * Xsign, 0, draggedBC[0].groupPosition.z + z * Zsign);
+                            if (i++ < MaxDraggedObjectCount)
+                            {
+                                draggedBC[i].SetBCinGroup(draggingGroup, currentPos);
+                                //Debug.Log("2 dimensions dragging - calling SetBCinGroup on " + draggedBC[i].name + " group:" + draggedBC[i].beyondGroup.name);
+                                ConstraintController.SetCanPlaceObjectColour(draggedBC[i]);
+                                draggedBC[i].gameObject.SetActive(true);
+                            }
+                        }
+                    }
+                }
+                // Deactivate all ghosts that are not used in the area we are currently dragging
+                if (i >= 0)
+                {
+                    for (int j = i + 1; j <= MaxDraggedObjectCount; j++)
+                    {
+                        draggedBC[j].gameObject.SetActive(false);
+                    }
+                }
             }
         }
         private void PlaceOnClic()

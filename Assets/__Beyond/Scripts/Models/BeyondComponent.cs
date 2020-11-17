@@ -162,7 +162,6 @@ namespace Beyond
             }
         }
 
-        //TODO : don't think this is used any more
         private static Quaternion sideRotation(cellSide cs)
         {
             switch(cs)

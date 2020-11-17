@@ -106,12 +106,13 @@ namespace Beyond
             else
             {
                 // 2 -All non-foundations objects must be clear of terrain and trees- return false immediately if they're not
-                if(AllClear(bc , getTerrainAndTreesMask())) return true ;
+                if(AllClear(bc , getTerrainAndTreesMask())) return true;
             }
 
             //3 - All non-foundations must be snapped to another building part
             if (bc.template.name!="Foundation" && bc.beyondGroup==null)
             {
+                // TO DO : I must check if I can snap here, but how to do that with dragged ghosts ?
                 return false ;
             }
 
@@ -121,6 +122,7 @@ namespace Beyond
 
         public static bool CanSnapTo(BeyondComponent bc , BeyondGroup group , Vector3Int here)
         {
+            Debug.Log("CanSnapTo called on "+bc.name+" for group "+(group==null ? "null" : group.name) + " at "+here);
             if (group==null)
                 return false ;
 
@@ -179,6 +181,7 @@ namespace Beyond
         public static bool IsTemplatePresentHere(BeyondGroup group , Vector3Int here , string t_name)
         {
             if (group == null) return false;
+            // TODO : With the restriction on Ghosts, I can't snap dragged objects. Is there a way around this ?
             return group.BeyondComponentsAt(here).Exists(bc => bc.template.name == t_name && bc.state!=BC_State.Ghost) ;
         }
 
@@ -189,14 +192,16 @@ namespace Beyond
                 Debug.Log("IsTemplatePresentHere foudn no group, returned FALSE");
                 return false;
             }
-            return group.BeyondComponentsAt(here).Exists(bc => bc.template.name == t_name && bc.side == cs && bc.state != BC_State.Ghost) ;
+            // TODO : With the restriction on Ghosts, I can't snap dragged objects. Is there a way around this ?
+            return group.BeyondComponentsAt(here).Exists(bc => bc.template.name == t_name && bc.side == cs && bc.state != BC_State.Ghost);
         }
 
         public static void SetCanPlaceObjectColour(BeyondComponent bc)
         {
             Renderer r = bc.gameObject.GetComponent<Renderer>();
-            //r.material.color = (ConstraintController.CanPlace(bc) ? Color.green : Color.red);
-            r.material.color = (ConstraintController.CanSnapTo(bc, bc.beyondGroup , bc.groupPosition) ? Color.green : Color.red);
+            r.material.color = (ConstraintController.CanPlace(bc) ? Color.green : Color.red);
+            //Debug.Log("Setting can place colour on " + bc.name + " in group " + (bc.beyondGroup==null ? "null" : bc.beyondGroup.name) + " at position "+bc.groupPosition + " = "+ ConstraintController.CanSnapTo(bc, bc.beyondGroup, bc.groupPosition));
+            //r.material.color = (ConstraintController.CanSnapTo(bc, bc.beyondGroup , bc.groupPosition) ? Color.green : Color.red);
         }
 
         /*
