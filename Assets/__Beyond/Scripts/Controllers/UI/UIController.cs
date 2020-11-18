@@ -82,13 +82,16 @@ namespace Beyond
             if (Input.GetKey(KeyCode.LeftControl) && (mouseWheelDelta  != Input.mouseScrollDelta.y))
             {
                 mouseWheelDelta = Input.mouseScrollDelta.y;
-                forwardOffset += mouseWheelDelta ;
-                forwardOffset = Mathf.Max(forwardOffset , MinForwardOffset) ;
+                SetForwardOffset(forwardOffset + mouseWheelDelta) ;
                 return true;
             }
             return false;
         }
 
+        public void SetForwardOffset(float f)
+        {
+            forwardOffset = Mathf.Max(f, MinForwardOffset);
+        }
 
         public void setGameMode(gameMode gm)
         { // Show the cursor only in interface mode

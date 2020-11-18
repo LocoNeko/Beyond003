@@ -22,6 +22,8 @@ namespace Beyond
         // TODO Dragging stuff: to sort out
         List<BeyondComponent> draggedBC;
         public BeyondGroup draggingGroup ;
+        float ForwardOffsetBeforeDragging;
+
         Vector3Int lastGroupPosition ;
         int MaxDraggedObjectCount = 256;
 
@@ -43,8 +45,8 @@ namespace Beyond
                     RotateFromMouseWheel();
                     //if (Input.mousePosition!=mousePosition || wasRotated)
                     //{ // only move placeable object when mouse has moved
-                        mousePosition = Input.mousePosition;
-                        MovePlaceableObjectToMouse();
+                    mousePosition = Input.mousePosition;
+                    MovePlaceableObjectToMouse();
                     //}
 
                     // Make the placeable red or green based on whether it can be placed
@@ -68,18 +70,23 @@ namespace Beyond
             //LayerMask layerMask = (ConstraintController.ShowOnTerrain(currentBC.template) ? ConstraintController.getTerrainMask() : ConstraintController.getBuildingsMask()) ;
             Vector3 position ;
 
+            // 1 - If we hit a building, show the Ghost on it
             if (Physics.Raycast(ray1, out hitInfo, UIController.Instance.forwardOffset, ConstraintController.getBuildingsMask()))
             {
                 //Debug.Log("Move to mouse: hit a BUILDING");
                 position = ConstraintController.PlaceGhost(currentBC, hitInfo.point, ConstraintController.getBuildingsMask());
             }
+
+            // 2 - If we hit terrain, show the Ghost on it
             else if (Physics.Raycast(ray1, out hitInfo, UIController.Instance.forwardOffset , ConstraintController.getTerrainMask()))
             {
                 //Debug.Log("Move to mouse: hit TERRAIN");
                 position = ConstraintController.PlaceGhost(currentBC , hitInfo.point, ConstraintController.getTerrainMask());
             }
+
+            // 3 - If we hit nothing, just make the object float in front of us at a distance of forwardOffset
             else
-            { // If we don't hit terrain, just make the object float in front of us
+            { 
                 //Debug.Log("Move to mouse: FLOAT");
                 Ray ray2 = Camera.main.ScreenPointToRay(mousePosition);
                 position = Camera.main.transform.position + ray2.direction * UIController.Instance.forwardOffset ;
@@ -124,13 +131,14 @@ namespace Beyond
 
                 // TODO : move this constraint to ConstraintController
                 // Test to see if foundation is above groud like in GetValidPositionFromMouse
-                Vector3 point = ConstraintController.GetPointOnLayer(currentBC , currentBC.transform.position , ConstraintController.getTerrainMask()) ;
-                float minY = point.y ;
                 //TODO: Hardcode for the time being as I tweak GetPointOnLayer
-                minY = 0;
+                //TODO : I have removed minY so don't need the code below. See if that works. CanSnapTo should ideally prevent being inside terrain anyway
+                //Vector3 point = ConstraintController.GetPointOnLayer(currentBC , currentBC.transform.position , ConstraintController.getTerrainMask()) ;
+                //float minY = point.y ;
+                //minY = 0;
 
-                if (snappedPosition.y>=minY)
-                { // Snap in place only if object's top is above ground
+                //if (snappedPosition.y>=minY)
+                //{ // Snap in place only if object's top is above ground
 
                     // Not needed aymore-angle between the rotation of the group and the rotation of the object on the Y axis : float angle = Mathf.Abs(currentPlaceableObject.transform.rotation.eulerAngles.y - closestGroup.rotation.eulerAngles.y );
 
@@ -140,7 +148,7 @@ namespace Beyond
                         currentBC.SetBCinGroup(closestGroup, diffInt2);
                     }
                     // else Debug.Log("Can't snap here because of group constraints");
-                }
+                //}
             }
             else
             {
@@ -228,6 +236,7 @@ namespace Beyond
                 Vector3 objectPosition = currentBC.transform.position - currentBC.template.pivotOffset ;
                 objectPosition = Utility.RotateAroundPoint(objectPosition , draggingGroup.position , Quaternion.Inverse(draggingGroup.rotation)) ;
                 Vector3Int objectGroupPosition = Vector3Int.RoundToInt(objectPosition - draggingGroup.position);
+                PushForwardOffset(); // Push ForwardOffset if dragging away
 
                 //TODO : I had to add draggedBC.Count > 0 to correct an error on draggedBC being empty, but how could it be empty ?
                 // If there was a change in position since last time we dragged, update
@@ -275,8 +284,16 @@ namespace Beyond
             }
         }
 
+        void PushForwardOffset()
+        {
+            float DistanceToBC = Vector3.Distance(currentBC.transform.position, Camera.main.transform.position) ;
+            if (DistanceToBC > UIController.Instance.forwardOffset)
+                UIController.Instance.SetForwardOffset(DistanceToBC+1);
+        }
+
         void StartDrag()
         {
+            ForwardOffsetBeforeDragging = UIController.Instance.forwardOffset;
             if (ConstraintController.CanPlace(currentBC))
             {
                 string templateName = currentBC.template.name;
@@ -314,6 +331,7 @@ namespace Beyond
             dragTo = Utility.ClosestPointOnLine(p2, p2 + p1, objectPosition);
             testSphere.transform.position = dragTo;
             objectGroupPosition = Vector3Int.RoundToInt(dragTo - draggingGroup.position);
+            /*
             if (objectGroupPosition != lastGroupPosition)
             { // even after projecting on a line, are we still in a new cell ?
               //TODO : Best to move the current placeable object on that position, to keep it on a line
@@ -343,6 +361,7 @@ namespace Beyond
                     }
                 }
             }
+            */
         }
 
         void Drag2D(Vector3Int objectGroupPosition, Vector3 objectPosition, Vector3 p1, Vector3 p2)
@@ -406,6 +425,7 @@ namespace Beyond
                 Destroy(currentBC.gameObject);
                 draggingGroup = null ;
                 draggedBC.Clear();
+                UIController.Instance.SetForwardOffset(ForwardOffsetBeforeDragging); // reset ForwardOffset to what it was before dragging - less annoying
                 /*
                 This works for 1 clic :
 
