@@ -12,6 +12,7 @@ namespace Beyond
         TextMeshProUGUI TM_Infos ;
         TextMeshProUGUI TM_CurrentPosition ;
         TextMeshProUGUI TM_GameTime ;
+        GameObject Compass;
         public BeyondGroup closestGroup {get; protected set;}
         public Vector3Int positionInGroup ;
         public float forwardOffset {get; protected set;}
@@ -25,6 +26,7 @@ namespace Beyond
             TM_CurrentPosition = GameObject.Find("Label_CurrentPosition").GetComponent<TextMeshProUGUI>();
             TM_Infos = GameObject.Find("Label_Infos").GetComponent<TextMeshProUGUI>() ;
             TM_GameTime = GameObject.Find("Label_GameTime").GetComponent<TextMeshProUGUI>() ;
+            Compass = GameObject.Find("Compass");
             positionInGroup = new Vector3Int(-999,-999,-999);
             forwardOffset = 10f; // By default, try to place objects 10 units away from camera
             mouseWheelDelta = 0;
@@ -60,6 +62,7 @@ namespace Beyond
             TM_CurrentPosition.text = string.Format("X={0:0.00};Y={1:0.00};Z={2:0.00}\nClosest group: {3}, {4}" , FPposition.x ,FPposition.y , FPposition.z , (closestGroup==null ? "N/A" : closestGroup.name) , positionInGroup);
 
             TM_GameTime.text = place.gametime.DateStr();
+            Compass.transform.eulerAngles = new Vector3(0,0,FirstPersonController.Instance.transform.eulerAngles.y) ;
         }
 
         void ChangeGameMode()

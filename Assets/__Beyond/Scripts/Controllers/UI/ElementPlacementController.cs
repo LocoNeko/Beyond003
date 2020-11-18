@@ -415,7 +415,7 @@ namespace Beyond
                     if (draggedBC[i].gameObject.activeSelf && ConstraintController.CanPlace(draggedBC[i]))
                     {
                         string name = currentBC.template.name + "_" + (nbObjectsPlaced++) ;
-                        TemplateController.PlaceObject(draggedBC[i] , name) ;
+                        TemplateController.PlaceObject(draggedBC[i] , name , BC_State.Blueprint) ;
                     }
                     else
                     {
@@ -432,7 +432,7 @@ namespace Beyond
                 if (ConstraintController.CanPlace(currentPlaceableObject))
                 {
                     string name = currentBC.template.name + "_" + (nbObjectsPlaced++) ;
-                    TemplateController.PlaceObject(ref currentPlaceableObject , name) ;
+                    TemplateController.PlaceObject(ref currentPlaceableObject , name , BC_State.Blueprint) ;
                 }
                 else
                 {

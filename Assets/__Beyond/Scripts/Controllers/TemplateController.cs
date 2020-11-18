@@ -101,7 +101,7 @@ namespace Beyond
             return bc ;
         }
 
-        public static void PlaceObject(BeyondComponent bc , string name , BC_State state = BC_State.Blueprint)
+        public static void PlaceObject(BeyondComponent bc , string name , BC_State state)
         {
             bc.gameObject.name = name ;
 
