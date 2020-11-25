@@ -141,7 +141,7 @@ namespace Beyond
                 groupPosition = p ;
 
                 // If this template can only be on a specific side, use it, otherwise determine the side based on the rotation of the BC
-                side = (template.fixedSide == null) ? getSideByRotation(transform.rotation) : (cellSide)template.fixedSide ;
+                side = (template.fixedSide == null) ? getSideByRotation(this , g, p) : (cellSide)template.fixedSide ;
 
                 //TODO : Maybe I need one last check based on side : is there really no object here on the same postion and rotation 
 
@@ -213,8 +213,13 @@ namespace Beyond
             return result ;
         }
 
-        public static cellSide getSideByRotation(Quaternion r)
+        public static cellSide getSideByRotation(BeyondComponent bc, BeyondGroup group , Vector3Int pos)
         {
+            float d = Vector3.Distance(bc.transform.position - bc.template.pivotOffset, group.position + (Vector3)pos);
+            Debug.Log("getSideByRotation. Distance from pivot="+d);
+            Quaternion r = bc.transform.rotation;
+            //TODO : Back & Front / Left & Right can both be returned based on how close we are from one edge or the other.
+            // So this function must do better than this and work on a transform, not just a Quaternion
             float angle = Quaternion.Angle(Quaternion.identity , r) ;
             if (angle>45f && angle<=135f)
                 return cellSide.Right ;

@@ -140,16 +140,24 @@ namespace Beyond
             }
             if (bc.template.name=="Wall")
             {
-                if (IsTemplatePresentHere(group, here, bc.template.name, BeyondComponent.getSideByRotation(bc.transform.rotation))) return false; // Can't have wall in the same position and side
+                if (IsTemplatePresentHere(group, here, bc.template.name, BeyondComponent.getSideByRotation(bc , group , here)))
+                {
+                    Debug.Log("CanSnapTo FALSE = Can't have wall in the same position and side");
+                    return false; // Can't have wall in the same position and side
+                }
 
                 // There must be a foundation to place a Wall
-                if (IsTemplatePresentHere(group , here, "Foundation")) 
-                    return true ; 
+                if (IsTemplatePresentHere(group , here, "Foundation"))
+                {
+                    Debug.Log("CanSnapTo TRUE = Found foundation");
+                    return true;
+                }
+                Debug.Log("CanSnapTo FALSE = No foundation");
                 return false;
             }
             if (bc.template.name=="Wallhole")
             {
-                if (IsTemplatePresentHere(group, here, bc.template.name, BeyondComponent.getSideByRotation(bc.transform.rotation))) return false; // Can't have wallhole in the same position and side
+                if (IsTemplatePresentHere(group, here, bc.template.name, BeyondComponent.getSideByRotation(bc , group , here))) return false; // Can't have wallhole in the same position and side
 
                 // There must be a foundation to place a Wall
                 if (IsTemplatePresentHere(group , here, "Foundation")) 
@@ -189,7 +197,7 @@ namespace Beyond
         {
             if (group == null) 
             {
-                Debug.Log("IsTemplatePresentHere foudn no group, returned FALSE");
+                Debug.Log("IsTemplatePresentHere found no group, returned FALSE");
                 return false;
             }
             // TODO : With the restriction on Ghosts, I can't snap dragged objects. Is there a way around this ?

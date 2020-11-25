@@ -49,8 +49,12 @@ namespace Beyond
             {
                 foreach(BeyondComponent bc in bg.componentList)
                 {
-                    SavedComponent sc = new SavedComponent(bc) ;
-                    save.components.Add(sc) ;
+                    //TODO : but wait, how can a group have a null BC ? there's something rotten
+                    if (bc!=null)
+                    {
+                        SavedComponent sc = new SavedComponent(bc);
+                        save.components.Add(sc);
+                    }
                 }
             }
             return save ;
